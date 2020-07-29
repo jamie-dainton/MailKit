@@ -1,9 +1,9 @@
 ﻿//
 // ImapToken.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 //
+
+using System.Globalization;
 
 namespace MailKit.Net.Imap {
 	enum ImapTokenType {
@@ -71,7 +73,7 @@ namespace MailKit.Net.Imap {
 			case ImapTokenType.Asterisk:     return "'*'";
 			case ImapTokenType.OpenBracket:  return "'['";
 			case ImapTokenType.CloseBracket: return "']'";
-			default:                         return string.Format ("[{0}: '{1}']", Type, Value);
+			default:                         return string.Format (CultureInfo.InvariantCulture, "[{0}: '{1}']", Type, Value);
 			}
 		}
 	}

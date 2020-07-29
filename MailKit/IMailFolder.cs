@@ -1,9 +1,9 @@
-//
+﻿//
 // IMailFolder.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -70,10 +70,39 @@ namespace MailKit {
 		FolderAttributes Attributes { get; }
 
 		/// <summary>
+		/// Get the annotation access level.
+		/// </summary>
+		/// <remarks>
+		/// If annotations are supported, this property can be used to determine whether or not
+		/// the <see cref="IMailFolder"/> supports reading and writing annotations.
+		/// </remarks>
+		AnnotationAccess AnnotationAccess { get; }
+
+		/// <summary>
+		/// Get the supported annotation scopes.
+		/// </summary>
+		/// <remarks>
+		/// If annotations are supported, this property can be used to determine which
+		/// annotation scopes are supported by the <see cref="IMailFolder"/>.
+		/// </remarks>
+		AnnotationScope AnnotationScopes { get; }
+
+		/// <summary>
+		/// Get the maximum size of annotation values supported by the folder.
+		/// </summary>
+		/// <remarks>
+		/// If annotations are supported, this property can be used to determine the
+		/// maximum size of annotation values supported by the <see cref="IMailFolder"/>.
+		/// </remarks>
+		uint MaxAnnotationSize { get; }
+
+		/// <summary>
 		/// Get the permanent flags.
 		/// </summary>
 		/// <remarks>
-		/// The permanent flags are the message flags that will persist between sessions.
+		/// <para>The permanent flags are the message flags that will persist between sessions.</para>
+		/// <para>If the <see cref="MessageFlags.UserDefined"/> flag is set, then the folder allows
+		/// storing of user-defined (custom) message flags.</para>
 		/// </remarks>
 		/// <value>The permanent flags.</value>
 		MessageFlags PermanentFlags { get; }
@@ -135,6 +164,19 @@ namespace MailKit {
 		string Name { get; }
 
 		/// <summary>
+		/// Get the unique identifier for the folder, if available.
+		/// </summary>
+		/// <remarks>
+		/// <para>Gets a unique identifier for the folder, if available. This is useful for clients
+		/// implementing a message cache that want to track the folder after it is renamed by another
+		/// client.</para>
+		/// <note type="note">This property will only be available if the server supports the
+		/// <a href="https://tools.ietf.org/html/rfc8474">OBJECTID</a> extension.</note>
+		/// </remarks>
+		/// <value>The unique folder identifier.</value>
+		string Id { get; }
+
+		/// <summary>
 		/// Get whether or not the folder is subscribed.
 		/// </summary>
 		/// <remarks>
@@ -165,10 +207,12 @@ namespace MailKit {
 		/// Get whether or not the folder supports mod-sequences.
 		/// </summary>
 		/// <remarks>
-		/// If mod-sequences are not supported by the folder, then all of the APIs that take a modseq
-		/// argument will throw <see cref="System.NotSupportedException"/> and should not be used.
+		/// <para>Gets whether or not the folder supports mod-sequences.</para>
+		/// <para>If mod-sequences are not supported by the folder, then all of the APIs that take a modseq
+		/// argument will throw <see cref="System.NotSupportedException"/> and should not be used.</para>
 		/// </remarks>
-		/// <value><c>true</c> if supports mod-sequences; otherwise, <c>false</c>.</value>
+		/// <value><c>true</c> if the folder supports mod-sequences; otherwise, <c>false</c>.</value>
+		[Obsolete ("Use Supports(FolderFeature.ModSequences) instead.")]
 		bool SupportsModSeq { get; }
 
 		/// <summary>
@@ -202,6 +246,26 @@ namespace MailKit {
 		UniqueId? UidNext { get; }
 
 		/// <summary>
+		/// Get the maximum size of a message that can be appended to the folder.
+		/// </summary>
+		/// <remarks>
+		/// <para>Gets the maximum size of a message that can be appended to the folder.</para>
+		/// <note type="note">If the value is not set, then the limit is unspecified.</note>
+		/// </remarks>
+		/// <value>The append limit.</value>
+		uint? AppendLimit { get; }
+
+		/// <summary>
+		/// Get the size of the folder.
+		/// </summary>
+		/// <remarks>
+		/// <para>Gets the size of the folder in bytes.</para>
+		/// <note type="note">If the value is not set, then the size is unspecified.</note>
+		/// </remarks>
+		/// <value>The size.</value>
+		ulong? Size { get; }
+
+		/// <summary>
 		/// Get the index of the first unread message in the folder.
 		/// </summary>
 		/// <remarks>
@@ -215,8 +279,9 @@ namespace MailKit {
 		/// </summary>
 		/// <remarks>
 		/// <para>Gets the number of unread messages in the folder.</para>
-		/// <para>Note: This value will only be set after calling <see cref="Status(StatusItems, System.Threading.CancellationToken)"/>
-		/// with <see cref="StatusItems.Unread"/>.</para>
+		/// <note type="note">This value will only be set after calling
+		/// <see cref="Status(StatusItems, System.Threading.CancellationToken)"/>
+		/// with <see cref="StatusItems.Unread"/>.</note>
 		/// </remarks>
 		/// <value>The number of unread messages.</value>
 		int Unread { get; }
@@ -226,8 +291,10 @@ namespace MailKit {
 		/// </summary>
 		/// <remarks>
 		/// <para>Gets the number of recently delivered messages in the folder.</para>
-		/// <para>Note: This value will only be set after calling <see cref="Status(StatusItems, System.Threading.CancellationToken)"/>
-		/// with <see cref="StatusItems.Recent"/>.</para>
+		/// <note type="note">
+		/// This value will only be set after calling
+		/// <see cref="Status(StatusItems, System.Threading.CancellationToken)"/>
+		/// with <see cref="StatusItems.Recent"/>.</note>
 		/// </remarks>
 		/// <value>The number of recently delivered messages.</value>
 		int Recent { get; }
@@ -240,6 +307,25 @@ namespace MailKit {
 		/// </remarks>
 		/// <value>The total number of messages.</value>
 		int Count { get; }
+
+		/// <summary>
+		/// Get the threading algorithms supported by the folder.
+		/// </summary>
+		/// <remarks>
+		/// Get the threading algorithms supported by the folder.
+		/// </remarks>
+		/// <value>The supported threading algorithms.</value>
+		HashSet<ThreadingAlgorithm> ThreadingAlgorithms { get; }
+
+		/// <summary>
+		/// Determine whether or not an <see cref="IMailFolder"/> supports a feature.
+		/// </summary>
+		/// <remarks>
+		/// Determines whether or not an <see cref="IMailFolder"/> supports a feature.
+		/// </remarks>
+		/// <param name="feature">The desired feature.</param>
+		/// <returns><c>true</c> if the feature is supported; otherwise, <c>false</c>.</returns>
+		bool Supports (FolderFeature feature);
 
 		/// <summary>
 		/// Opens the folder using the requested folder access.
@@ -330,7 +416,7 @@ namespace MailKit {
 		/// </remarks>
 		/// <returns>The created folder.</returns>
 		/// <param name="name">The name of the folder to create.</param>
-		/// <param name="isMessageFolder"><c>true</c> if the folder will be used to contain messages; otherwise <c>false</c>.</param>
+		/// <param name="isMessageFolder"><c>true</c> if the folder will be used to contain messages; otherwise, <c>false</c>.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
 		IMailFolder Create (string name, bool isMessageFolder, CancellationToken cancellationToken = default (CancellationToken));
 
@@ -342,9 +428,57 @@ namespace MailKit {
 		/// </remarks>
 		/// <returns>The created folder.</returns>
 		/// <param name="name">The name of the folder to create.</param>
-		/// <param name="isMessageFolder"><c>true</c> if the folder will be used to contain messages; otherwise <c>false</c>.</param>
+		/// <param name="isMessageFolder"><c>true</c> if the folder will be used to contain messages; otherwise, <c>false</c>.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
 		Task<IMailFolder> CreateAsync (string name, bool isMessageFolder, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Create a new subfolder with the given name.
+		/// </summary>
+		/// <remarks>
+		/// Creates a new subfolder with the given name.
+		/// </remarks>
+		/// <returns>The created folder.</returns>
+		/// <param name="name">The name of the folder to create.</param>
+		/// <param name="specialUses">A list of special uses for the folder being created.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		IMailFolder Create (string name, IEnumerable<SpecialFolder> specialUses, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously create a new subfolder with the given name.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously creates a new subfolder with the given name.
+		/// </remarks>
+		/// <returns>The created folder.</returns>
+		/// <param name="name">The name of the folder to create.</param>
+		/// <param name="specialUses">A list of special uses for the folder being created.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task<IMailFolder> CreateAsync (string name, IEnumerable<SpecialFolder> specialUses, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Create a new subfolder with the given name.
+		/// </summary>
+		/// <remarks>
+		/// Creates a new subfolder with the given name.
+		/// </remarks>
+		/// <returns>The created folder.</returns>
+		/// <param name="name">The name of the folder to create.</param>
+		/// <param name="specialUse">The special use for the folder being created.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		IMailFolder Create (string name, SpecialFolder specialUse, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously create a new subfolder with the given name.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously creates a new subfolder with the given name.
+		/// </remarks>
+		/// <returns>The created folder.</returns>
+		/// <param name="name">The name of the folder to create.</param>
+		/// <param name="specialUse">The special use for the folder being created.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task<IMailFolder> CreateAsync (string name, SpecialFolder specialUse, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Rename the folder.
@@ -430,12 +564,43 @@ namespace MailKit {
 		/// Get the subfolders.
 		/// </summary>
 		/// <remarks>
+		/// <para>Gets the subfolders as well as queries the server for the status of the requested items.</para>
+		/// <para>When the <paramref name="items"/> argument is non-empty, this has the equivalent functionality
+		/// of calling <see cref="GetSubfolders(bool,System.Threading.CancellationToken)"/> and then calling
+		/// <see cref="Status(StatusItems,System.Threading.CancellationToken)"/> on each of the returned folders.</para>
+		/// <note type="tip">Using this method is potentially more efficient than querying the status of each returned folder.</note>
+		/// </remarks>
+		/// <returns>The subfolders.</returns>
+		/// <param name="items">The status items to pre-populate.</param>
+		/// <param name="subscribedOnly">If set to <c>true</c>, only subscribed folders will be listed.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		IList<IMailFolder> GetSubfolders (StatusItems items, bool subscribedOnly = false, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously get the subfolders.
+		/// </summary>
+		/// <remarks>
+		/// <para>Asynchronously gets the subfolders as well as queries the server for the status of the requested items.</para>
+		/// <para>When the <paramref name="items"/> argument is non-empty, this has the equivalent functionality
+		/// of calling <see cref="GetSubfoldersAsync(bool,System.Threading.CancellationToken)"/> and then calling
+		/// <see cref="StatusAsync(StatusItems,System.Threading.CancellationToken)"/> on each of the returned folders.</para>
+		/// </remarks>
+		/// <returns>The subfolders.</returns>
+		/// <param name="items">The status items to pre-populate.</param>
+		/// <param name="subscribedOnly">If set to <c>true</c>, only subscribed folders will be listed.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task<IList<IMailFolder>> GetSubfoldersAsync (StatusItems items, bool subscribedOnly = false, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Get the subfolders.
+		/// </summary>
+		/// <remarks>
 		/// Gets the subfolders.
 		/// </remarks>
 		/// <returns>The subfolders.</returns>
 		/// <param name="subscribedOnly">If set to <c>true</c>, only subscribed folders will be listed.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IEnumerable<IMailFolder> GetSubfolders (bool subscribedOnly = false, CancellationToken cancellationToken = default (CancellationToken));
+		IList<IMailFolder> GetSubfolders (bool subscribedOnly = false, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously get the subfolders.
@@ -446,7 +611,7 @@ namespace MailKit {
 		/// <returns>The subfolders.</returns>
 		/// <param name="subscribedOnly">If set to <c>true</c>, only subscribed folders will be listed.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IEnumerable<IMailFolder>> GetSubfoldersAsync (bool subscribedOnly = false, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<IMailFolder>> GetSubfoldersAsync (bool subscribedOnly = false, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Get the specified subfolder.
@@ -729,16 +894,105 @@ namespace MailKit {
 		Task<FolderQuota> SetQuotaAsync (uint? messageLimit, uint? storageLimit, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
+		/// Gets the specified metadata.
+		/// </summary>
+		/// <remarks>
+		/// Gets the specified metadata.
+		/// </remarks>
+		/// <returns>The requested metadata value.</returns>
+		/// <param name="tag">The metadata tag.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		string GetMetadata (MetadataTag tag, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously gets the specified metadata.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously gets the specified metadata.
+		/// </remarks>
+		/// <returns>The requested metadata value.</returns>
+		/// <param name="tag">The metadata tag.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task<string> GetMetadataAsync (MetadataTag tag, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Gets the specified metadata.
+		/// </summary>
+		/// <remarks>
+		/// Gets the specified metadata.
+		/// </remarks>
+		/// <returns>The requested metadata.</returns>
+		/// <param name="tags">The metadata tags.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		MetadataCollection GetMetadata (IEnumerable<MetadataTag> tags, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously gets the specified metadata.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously gets the specified metadata.
+		/// </remarks>
+		/// <returns>The requested metadata.</returns>
+		/// <param name="tags">The metadata tags.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task<MetadataCollection> GetMetadataAsync (IEnumerable<MetadataTag> tags, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Gets the specified metadata.
+		/// </summary>
+		/// <remarks>
+		/// Gets the specified metadata.
+		/// </remarks>
+		/// <returns>The requested metadata.</returns>
+		/// <param name="options">The metadata options.</param>
+		/// <param name="tags">The metadata tags.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		MetadataCollection GetMetadata (MetadataOptions options, IEnumerable<MetadataTag> tags, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously gets the specified metadata.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously gets the specified metadata.
+		/// </remarks>
+		/// <returns>The requested metadata.</returns>
+		/// <param name="options">The metadata options.</param>
+		/// <param name="tags">The metadata tags.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task<MetadataCollection> GetMetadataAsync (MetadataOptions options, IEnumerable<MetadataTag> tags, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Sets the specified metadata.
+		/// </summary>
+		/// <remarks>
+		/// Sets the specified metadata.
+		/// </remarks>
+		/// <param name="metadata">The metadata.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		void SetMetadata (MetadataCollection metadata, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously sets the specified metadata.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously sets the specified metadata.
+		/// </remarks>
+		/// <returns>An asynchronous task context.</returns>
+		/// <param name="metadata">The metadata.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task SetMetadataAsync (MetadataCollection metadata, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
 		/// Expunge the folder, permanently removing all messages marked for deletion.
 		/// </summary>
 		/// <remarks>
 		/// <para>Expunges the folder, permanently removing all messages marked for deletion.</para>
-		/// <para>Note: Normally, an <see cref="MessageExpunged"/> event will be emitted for each
+		/// <note type="note">Normally, an <see cref="MessageExpunged"/> event will be emitted for each
 		/// message that is expunged. However, if the mail store supports the quick
 		/// resynchronization feature and it has been enabled via the
 		/// <see cref="IMailStore.EnableQuickResync(CancellationToken)"/> method, then
 		/// the <see cref="MessagesVanished"/> event will be emitted rather than the
-		/// <see cref="MessageExpunged"/> event.</para>
+		/// <see cref="MessageExpunged"/> event.</note>
 		/// </remarks>
 		/// <param name="cancellationToken">The cancellation token.</param>
 		void Expunge (CancellationToken cancellationToken = default (CancellationToken));
@@ -748,12 +1002,12 @@ namespace MailKit {
 		/// </summary>
 		/// <remarks>
 		/// <para>Asynchronously expunges the folder, permanently removing all messages marked for deletion.</para>
-		/// <para>Note: Normally, an <see cref="MessageExpunged"/> event will be emitted for each
-		/// message that is expunged. However, if the mail store supports the quick
+		/// <note type="note">Normally, an <see cref="MessageExpunged"/> event will be emitted for
+		/// each message that is expunged. However, if the mail store supports the quick
 		/// resynchronization feature and it has been enabled via the
 		/// <see cref="IMailStore.EnableQuickResync(CancellationToken)"/> method, then
 		/// the <see cref="MessagesVanished"/> event will be emitted rather than the
-		/// <see cref="MessageExpunged"/> event.</para>
+		/// <see cref="MessageExpunged"/> event.</note>
 		/// </remarks>
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="cancellationToken">The cancellation token.</param>
@@ -764,12 +1018,12 @@ namespace MailKit {
 		/// </summary>
 		/// <remarks>
 		/// <para>Expunges the specified uids, permanently removing them from the folder.</para>
-		/// <para>Note: Normally, an <see cref="MessageExpunged"/> event will be emitted for each
-		/// message that is expunged. However, if the mail store supports the quick
+		/// <note type="note">Normally, an <see cref="MessageExpunged"/> event will be emitted for
+		/// each message that is expunged. However, if the mail store supports the quick
 		/// resynchronization feature and it has been enabled via the
 		/// <see cref="IMailStore.EnableQuickResync(CancellationToken)"/> method, then
 		/// the <see cref="MessagesVanished"/> event will be emitted rather than the
-		/// <see cref="MessageExpunged"/> event.</para>
+		/// <see cref="MessageExpunged"/> event.</note>
 		/// </remarks>
 		/// <param name="uids">The message uids.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
@@ -780,12 +1034,12 @@ namespace MailKit {
 		/// </summary>
 		/// <remarks>
 		/// <para>Asynchronously expunges the specified uids, permanently removing them from the folder.</para>
-		/// <para>Note: Normally, an <see cref="MessageExpunged"/> event will be emitted for each
-		/// message that is expunged. However, if the mail store supports the quick
+		/// <note type="note">Normally, an <see cref="MessageExpunged"/> event will be emitted for
+		/// each message that is expunged. However, if the mail store supports the quick
 		/// resynchronization feature and it has been enabled via the
 		/// <see cref="IMailStore.EnableQuickResync(CancellationToken)"/> method, then
 		/// the <see cref="MessagesVanished"/> event will be emitted rather than the
-		/// <see cref="MessageExpunged"/> event.</para>
+		/// <see cref="MessageExpunged"/> event.</note>
 		/// </remarks>
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="uids">The message uids.</param>
@@ -853,6 +1107,36 @@ namespace MailKit {
 		/// Appends the specified message to the folder and returns the UniqueId assigned to the message.
 		/// </remarks>
 		/// <returns>The UID of the appended message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="date">The received date of the message.</param>
+		/// <param name="annotations">The message annotations.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		UniqueId? Append (MimeMessage message, MessageFlags flags, DateTimeOffset? date, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously append the specified message to the folder.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously appends the specified message to the folder and returns the UniqueId assigned to the message.
+		/// </remarks>
+		/// <returns>The UID of the appended message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="date">The received date of the message.</param>
+		/// <param name="annotations">The message annotations.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		Task<UniqueId?> AppendAsync (MimeMessage message, MessageFlags flags, DateTimeOffset? date, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Append the specified message to the folder.
+		/// </summary>
+		/// <remarks>
+		/// Appends the specified message to the folder and returns the UniqueId assigned to the message.
+		/// </remarks>
+		/// <returns>The UID of the appended message, if available; otherwise, <c>null</c>.</returns>
 		/// <param name="options">The formatting options.</param>
 		/// <param name="message">The message.</param>
 		/// <param name="flags">The message flags.</param>
@@ -903,6 +1187,38 @@ namespace MailKit {
 		/// <param name="cancellationToken">The cancellation token.</param>
 		/// <param name="progress">The progress reporting mechanism.</param>
 		Task<UniqueId?> AppendAsync (FormatOptions options, MimeMessage message, MessageFlags flags, DateTimeOffset date, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Append the specified message to the folder.
+		/// </summary>
+		/// <remarks>
+		/// Appends the specified message to the folder and returns the UniqueId assigned to the message.
+		/// </remarks>
+		/// <returns>The UID of the appended message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="options">The formatting options.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="date">The received date of the message.</param>
+		/// <param name="annotations">The message annotations.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		UniqueId? Append (FormatOptions options, MimeMessage message, MessageFlags flags, DateTimeOffset? date, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously append the specified message to the folder.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously appends the specified message to the folder and returns the UniqueId assigned to the message.
+		/// </remarks>
+		/// <returns>The UID of the appended message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="options">The formatting options.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="date">The received date of the message.</param>
+		/// <param name="annotations">The message annotations.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		Task<UniqueId?> AppendAsync (FormatOptions options, MimeMessage message, MessageFlags flags, DateTimeOffset? date, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
 
 		/// <summary>
 		/// Append the specified messages to the folder.
@@ -1017,6 +1333,246 @@ namespace MailKit {
 		Task<IList<UniqueId>> AppendAsync (FormatOptions options, IList<MimeMessage> messages, IList<MessageFlags> flags, IList<DateTimeOffset> dates, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
 
 		/// <summary>
+		/// Replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="uid">The UID of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		UniqueId? Replace (UniqueId uid, MimeMessage message, MessageFlags flags = MessageFlags.None, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="uid">The UID of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		Task<UniqueId?> ReplaceAsync (UniqueId uid, MimeMessage message, MessageFlags flags = MessageFlags.None, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="uid">The UID of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="date">The received date of the message.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		UniqueId? Replace (UniqueId uid, MimeMessage message, MessageFlags flags, DateTimeOffset date, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="uid">The UID of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="date">The received date of the message.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		Task<UniqueId?> ReplaceAsync (UniqueId uid, MimeMessage message, MessageFlags flags, DateTimeOffset date, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="options">The formatting options.</param>
+		/// <param name="uid">The UID of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		UniqueId? Replace (FormatOptions options, UniqueId uid, MimeMessage message, MessageFlags flags = MessageFlags.None, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="options">The formatting options.</param>
+		/// <param name="uid">The UID of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		Task<UniqueId?> ReplaceAsync (FormatOptions options, UniqueId uid, MimeMessage message, MessageFlags flags = MessageFlags.None, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="options">The formatting options.</param>
+		/// <param name="uid">The UID of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="date">The received date of the message.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		UniqueId? Replace (FormatOptions options, UniqueId uid, MimeMessage message, MessageFlags flags, DateTimeOffset date, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="options">The formatting options.</param>
+		/// <param name="uid">The UID of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="date">The received date of the message.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		Task<UniqueId?> ReplaceAsync (FormatOptions options, UniqueId uid, MimeMessage message, MessageFlags flags, DateTimeOffset date, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="index">The index of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		UniqueId? Replace (int index, MimeMessage message, MessageFlags flags = MessageFlags.None, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="index">The index of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>;
+		Task<UniqueId?> ReplaceAsync (int index, MimeMessage message, MessageFlags flags = MessageFlags.None, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="index">The index of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="date">The received date of the message.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		UniqueId? Replace (int index, MimeMessage message, MessageFlags flags, DateTimeOffset date, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="index">The index of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="date">The received date of the message.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		Task<UniqueId?> ReplaceAsync (int index, MimeMessage message, MessageFlags flags, DateTimeOffset date, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="options">The formatting options.</param>
+		/// <param name="index">The index of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		UniqueId? Replace (FormatOptions options, int index, MimeMessage message, MessageFlags flags = MessageFlags.None, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="options">The formatting options.</param>
+		/// <param name="index">The index of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		Task<UniqueId?> ReplaceAsync (FormatOptions options, int index, MimeMessage message, MessageFlags flags = MessageFlags.None, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="options">The formatting options.</param>
+		/// <param name="index">The index of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="date">The received date of the message.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		UniqueId? Replace (FormatOptions options, int index, MimeMessage message, MessageFlags flags, DateTimeOffset date, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously replace a message in the folder.
+		/// </summary>
+		/// <remarks>
+		/// Replaces the specified message in the folder and returns the UniqueId assigned to the new message.
+		/// </remarks>
+		/// <returns>The UID of the new message, if available; otherwise, <c>null</c>.</returns>
+		/// <param name="options">The formatting options.</param>
+		/// <param name="index">The index of the message to be replaced.</param>
+		/// <param name="message">The message.</param>
+		/// <param name="flags">The message flags.</param>
+		/// <param name="date">The received date of the message.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		Task<UniqueId?> ReplaceAsync (FormatOptions options, int index, MimeMessage message, MessageFlags flags, DateTimeOffset date, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
 		/// Copy the specified message to the destination folder.
 		/// </summary>
 		/// <remarks>
@@ -1046,11 +1602,11 @@ namespace MailKit {
 		/// <remarks>
 		/// Copies the specified messages to the destination folder.
 		/// </remarks>
-		/// <returns>The UIDs of the messages in the destination folder, if available; otherwise an empty array.</returns>
+		/// <returns>The UID mapping of the messages in the destination folder, if available; otherwise an empty mapping.</returns>
 		/// <param name="uids">The UIDs of the messages to copy.</param>
 		/// <param name="destination">The destination folder.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<UniqueId> CopyTo (IList<UniqueId> uids, IMailFolder destination, CancellationToken cancellationToken = default (CancellationToken));
+		UniqueIdMap CopyTo (IList<UniqueId> uids, IMailFolder destination, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously copy the specified messages to the destination folder.
@@ -1058,11 +1614,11 @@ namespace MailKit {
 		/// <remarks>
 		/// Asynchronously copies the specified messages to the destination folder.
 		/// </remarks>
-		/// <returns>The UIDs of the messages in the destination folder, if available; otherwise an empty array.</returns>
+		/// <returns>The UID mapping of the messages in the destination folder, if available; otherwise an empty mapping.</returns>
 		/// <param name="uids">The UIDs of the messages to copy.</param>
 		/// <param name="destination">The destination folder.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<UniqueId>> CopyToAsync (IList<UniqueId> uids, IMailFolder destination, CancellationToken cancellationToken = default (CancellationToken));
+		Task<UniqueIdMap> CopyToAsync (IList<UniqueId> uids, IMailFolder destination, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Move the specified message to the destination folder.
@@ -1094,11 +1650,11 @@ namespace MailKit {
 		/// <remarks>
 		/// Moves the specified messages to the destination folder.
 		/// </remarks>
-		/// <returns>The UIDs of the messages in the destination folder, if available; otherwise an empty array.</returns>
+		/// <returns>The UID mapping of the messages in the destination folder, if available; otherwise an empty mapping.</returns>
 		/// <param name="uids">The UIDs of the messages to copy.</param>
 		/// <param name="destination">The destination folder.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<UniqueId> MoveTo (IList<UniqueId> uids, IMailFolder destination, CancellationToken cancellationToken = default (CancellationToken));
+		UniqueIdMap MoveTo (IList<UniqueId> uids, IMailFolder destination, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously move the specified messages to the destination folder.
@@ -1106,11 +1662,11 @@ namespace MailKit {
 		/// <remarks>
 		/// Asynchronously moves the specified messages to the destination folder.
 		/// </remarks>
-		/// <returns>The UIDs of the messages in the destination folder, if available; otherwise an empty array.</returns>
+		/// <returns>The UID mapping of the messages in the destination folder, if available; otherwise an empty mapping.</returns>
 		/// <param name="uids">The UIDs of the messages to copy.</param>
 		/// <param name="destination">The destination folder.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<UniqueId>> MoveToAsync (IList<UniqueId> uids, IMailFolder destination, CancellationToken cancellationToken = default (CancellationToken));
+		Task<UniqueIdMap> MoveToAsync (IList<UniqueId> uids, IMailFolder destination, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Copy the specified message to the destination folder.
@@ -1216,6 +1772,9 @@ namespace MailKit {
 		/// messages that were requested as well as summaries for messages that were
 		/// not requested at all.</para>
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\ImapExamples.cs" region="DownloadBodyParts"/>
+		/// </example>
 		/// <returns>An enumeration of summaries for the requested messages.</returns>
 		/// <param name="uids">The UIDs.</param>
 		/// <param name="items">The message summary items to fetch.</param>
@@ -1256,9 +1815,9 @@ namespace MailKit {
 		/// <returns>An enumeration of summaries for the requested messages.</returns>
 		/// <param name="uids">The UIDs.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">The desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<IMessageSummary> Fetch (IList<UniqueId> uids, MessageSummaryItems items, HashSet<HeaderId> fields, CancellationToken cancellationToken = default (CancellationToken));
+		IList<IMessageSummary> Fetch (IList<UniqueId> uids, MessageSummaryItems items, IEnumerable<HeaderId> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously fetch the message summaries for the specified message UIDs.
@@ -1276,9 +1835,9 @@ namespace MailKit {
 		/// <returns>An enumeration of summaries for the requested messages.</returns>
 		/// <param name="uids">The UIDs.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">The desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<IMessageSummary>> FetchAsync (IList<UniqueId> uids, MessageSummaryItems items, HashSet<HeaderId> fields, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<IMessageSummary>> FetchAsync (IList<UniqueId> uids, MessageSummaryItems items, IEnumerable<HeaderId> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Fetch the message summaries for the specified message UIDs.
@@ -1295,9 +1854,9 @@ namespace MailKit {
 		/// <returns>An enumeration of summaries for the requested messages.</returns>
 		/// <param name="uids">The UIDs.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">The desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<IMessageSummary> Fetch (IList<UniqueId> uids, MessageSummaryItems items, HashSet<string> fields, CancellationToken cancellationToken = default (CancellationToken));
+		IList<IMessageSummary> Fetch (IList<UniqueId> uids, MessageSummaryItems items, IEnumerable<string> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously fetch the message summaries for the specified message UIDs.
@@ -1315,9 +1874,9 @@ namespace MailKit {
 		/// <returns>An enumeration of summaries for the requested messages.</returns>
 		/// <param name="uids">The UIDs.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">The desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<IMessageSummary>> FetchAsync (IList<UniqueId> uids, MessageSummaryItems items, HashSet<string> fields, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<IMessageSummary>> FetchAsync (IList<UniqueId> uids, MessageSummaryItems items, IEnumerable<string> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Fetch the message summaries for the specified message UIDs that have a
@@ -1391,9 +1950,9 @@ namespace MailKit {
 		/// <param name="uids">The UIDs.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">The desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<IMessageSummary> Fetch (IList<UniqueId> uids, ulong modseq, MessageSummaryItems items, HashSet<HeaderId> fields, CancellationToken cancellationToken = default (CancellationToken));
+		IList<IMessageSummary> Fetch (IList<UniqueId> uids, ulong modseq, MessageSummaryItems items, IEnumerable<HeaderId> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously fetch the message summaries for the specified message UIDs that have a
@@ -1417,9 +1976,9 @@ namespace MailKit {
 		/// <param name="uids">The UIDs.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">The desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<IMessageSummary>> FetchAsync (IList<UniqueId> uids, ulong modseq, MessageSummaryItems items, HashSet<HeaderId> fields, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<IMessageSummary>> FetchAsync (IList<UniqueId> uids, ulong modseq, MessageSummaryItems items, IEnumerable<HeaderId> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Fetch the message summaries for the specified message UIDs that have a
@@ -1443,9 +2002,9 @@ namespace MailKit {
 		/// <param name="uids">The UIDs.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">The desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<IMessageSummary> Fetch (IList<UniqueId> uids, ulong modseq, MessageSummaryItems items, HashSet<string> fields, CancellationToken cancellationToken = default (CancellationToken));
+		IList<IMessageSummary> Fetch (IList<UniqueId> uids, ulong modseq, MessageSummaryItems items, IEnumerable<string> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously fetch the message summaries for the specified message UIDs that have a
@@ -1469,9 +2028,9 @@ namespace MailKit {
 		/// <param name="uids">The UIDs.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">The desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<IMessageSummary>> FetchAsync (IList<UniqueId> uids, ulong modseq, MessageSummaryItems items, HashSet<string> fields, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<IMessageSummary>> FetchAsync (IList<UniqueId> uids, ulong modseq, MessageSummaryItems items, IEnumerable<string> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Fetch the message summaries for the specified message indexes.
@@ -1525,9 +2084,9 @@ namespace MailKit {
 		/// <returns>An enumeration of summaries for the requested messages.</returns>
 		/// <param name="indexes">The indexes.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">THe desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<IMessageSummary> Fetch (IList<int> indexes, MessageSummaryItems items, HashSet<HeaderId> fields, CancellationToken cancellationToken = default (CancellationToken));
+		IList<IMessageSummary> Fetch (IList<int> indexes, MessageSummaryItems items, IEnumerable<HeaderId> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously fetch the message summaries for the specified message indexes.
@@ -1545,9 +2104,9 @@ namespace MailKit {
 		/// <returns>An enumeration of summaries for the requested messages.</returns>
 		/// <param name="indexes">The indexes.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">THe desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<IMessageSummary>> FetchAsync (IList<int> indexes, MessageSummaryItems items, HashSet<HeaderId> fields, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<IMessageSummary>> FetchAsync (IList<int> indexes, MessageSummaryItems items, IEnumerable<HeaderId> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Fetch the message summaries for the specified message indexes.
@@ -1564,9 +2123,9 @@ namespace MailKit {
 		/// <returns>An enumeration of summaries for the requested messages.</returns>
 		/// <param name="indexes">The indexes.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">THe desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<IMessageSummary> Fetch (IList<int> indexes, MessageSummaryItems items, HashSet<string> fields, CancellationToken cancellationToken = default (CancellationToken));
+		IList<IMessageSummary> Fetch (IList<int> indexes, MessageSummaryItems items, IEnumerable<string> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously fetch the message summaries for the specified message indexes.
@@ -1584,9 +2143,9 @@ namespace MailKit {
 		/// <returns>An enumeration of summaries for the requested messages.</returns>
 		/// <param name="indexes">The indexes.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">THe desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<IMessageSummary>> FetchAsync (IList<int> indexes, MessageSummaryItems items, HashSet<string> fields, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<IMessageSummary>> FetchAsync (IList<int> indexes, MessageSummaryItems items, IEnumerable<string> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Fetch the message summaries for the specified message indexes that have a
@@ -1648,9 +2207,9 @@ namespace MailKit {
 		/// <param name="indexes">The indexes.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">THe desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<IMessageSummary> Fetch (IList<int> indexes, ulong modseq, MessageSummaryItems items, HashSet<HeaderId> fields, CancellationToken cancellationToken = default (CancellationToken));
+		IList<IMessageSummary> Fetch (IList<int> indexes, ulong modseq, MessageSummaryItems items, IEnumerable<HeaderId> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously fetch the message summaries for the specified message indexes
@@ -1670,9 +2229,9 @@ namespace MailKit {
 		/// <param name="indexes">The indexes.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">THe desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<IMessageSummary>> FetchAsync (IList<int> indexes, ulong modseq, MessageSummaryItems items, HashSet<HeaderId> fields, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<IMessageSummary>> FetchAsync (IList<int> indexes, ulong modseq, MessageSummaryItems items, IEnumerable<HeaderId> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Fetch the message summaries for the specified message indexes that
@@ -1692,9 +2251,9 @@ namespace MailKit {
 		/// <param name="indexes">The indexes.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">THe desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<IMessageSummary> Fetch (IList<int> indexes, ulong modseq, MessageSummaryItems items, HashSet<string> fields, CancellationToken cancellationToken = default (CancellationToken));
+		IList<IMessageSummary> Fetch (IList<int> indexes, ulong modseq, MessageSummaryItems items, IEnumerable<string> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously fetch the message summaries for the specified message indexes
@@ -1714,9 +2273,9 @@ namespace MailKit {
 		/// <param name="indexes">The indexes.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">THe desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<IMessageSummary>> FetchAsync (IList<int> indexes, ulong modseq, MessageSummaryItems items, HashSet<string> fields, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<IMessageSummary>> FetchAsync (IList<int> indexes, ulong modseq, MessageSummaryItems items, IEnumerable<string> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Fetch the message summaries for the messages between the two indexes, inclusive.
@@ -1775,9 +2334,9 @@ namespace MailKit {
 		/// <param name="min">The minimum index.</param>
 		/// <param name="max">The maximum index, or <c>-1</c> to specify no upper bound.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">THe desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<IMessageSummary> Fetch (int min, int max, MessageSummaryItems items, HashSet<HeaderId> fields, CancellationToken cancellationToken = default (CancellationToken));
+		IList<IMessageSummary> Fetch (int min, int max, MessageSummaryItems items, IEnumerable<HeaderId> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously fetch the message summaries for the messages between the two indexes, inclusive.
@@ -1796,9 +2355,9 @@ namespace MailKit {
 		/// <param name="min">The minimum index.</param>
 		/// <param name="max">The maximum index, or <c>-1</c> to specify no upper bound.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">THe desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<IMessageSummary>> FetchAsync (int min, int max, MessageSummaryItems items, HashSet<HeaderId> fields, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<IMessageSummary>> FetchAsync (int min, int max, MessageSummaryItems items, IEnumerable<HeaderId> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Fetch the message summaries for the messages between the two indexes, inclusive.
@@ -1817,9 +2376,9 @@ namespace MailKit {
 		/// <param name="min">The minimum index.</param>
 		/// <param name="max">The maximum index, or <c>-1</c> to specify no upper bound.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">THe desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<IMessageSummary> Fetch (int min, int max, MessageSummaryItems items, HashSet<string> fields, CancellationToken cancellationToken = default (CancellationToken));
+		IList<IMessageSummary> Fetch (int min, int max, MessageSummaryItems items, IEnumerable<string> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously fetch the message summaries for the messages between the two indexes, inclusive.
@@ -1838,9 +2397,9 @@ namespace MailKit {
 		/// <param name="min">The minimum index.</param>
 		/// <param name="max">The maximum index, or <c>-1</c> to specify no upper bound.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">THe desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<IMessageSummary>> FetchAsync (int min, int max, MessageSummaryItems items, HashSet<string> fields, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<IMessageSummary>> FetchAsync (int min, int max, MessageSummaryItems items, IEnumerable<string> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Fetch the message summaries for the messages between the two indexes (inclusive)
@@ -1908,9 +2467,9 @@ namespace MailKit {
 		/// <param name="max">The maximum index, or <c>-1</c> to specify no upper bound.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">The desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<IMessageSummary> Fetch (int min, int max, ulong modseq, MessageSummaryItems items, HashSet<HeaderId> fields, CancellationToken cancellationToken = default (CancellationToken));
+		IList<IMessageSummary> Fetch (int min, int max, ulong modseq, MessageSummaryItems items, IEnumerable<HeaderId> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously fetch the message summaries for the messages between the two indexes
@@ -1932,9 +2491,9 @@ namespace MailKit {
 		/// <param name="max">The maximum index, or <c>-1</c> to specify no upper bound.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">The desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<IMessageSummary>> FetchAsync (int min, int max, ulong modseq, MessageSummaryItems items, HashSet<HeaderId> fields, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<IMessageSummary>> FetchAsync (int min, int max, ulong modseq, MessageSummaryItems items, IEnumerable<HeaderId> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Fetch the message summaries for the messages between the two indexes (inclusive)
@@ -1956,9 +2515,9 @@ namespace MailKit {
 		/// <param name="max">The maximum index, or <c>-1</c> to specify no upper bound.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">The desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<IMessageSummary> Fetch (int min, int max, ulong modseq, MessageSummaryItems items, HashSet<string> fields, CancellationToken cancellationToken = default (CancellationToken));
+		IList<IMessageSummary> Fetch (int min, int max, ulong modseq, MessageSummaryItems items, IEnumerable<string> headers, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously fetch the message summaries for the messages between the two indexes
@@ -1980,9 +2539,109 @@ namespace MailKit {
 		/// <param name="max">The maximum index, or <c>-1</c> to specify no upper bound.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="items">The message summary items to fetch.</param>
-		/// <param name="fields">The desired header fields.</param>
+		/// <param name="headers">The desired header fields.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<IMessageSummary>> FetchAsync (int min, int max, ulong modseq, MessageSummaryItems items, HashSet<string> fields, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<IMessageSummary>> FetchAsync (int min, int max, ulong modseq, MessageSummaryItems items, IEnumerable<string> headers, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Get the specified message headers.
+		/// </summary>
+		/// <remarks>
+		/// Gets the specified message headers.
+		/// </remarks>
+		/// <returns>The message headers.</returns>
+		/// <param name="uid">The UID of the message.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		HeaderList GetHeaders (UniqueId uid, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously get the specified message headers.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously gets the specified message headers.
+		/// </remarks>
+		/// <returns>The message headers.</returns>
+		/// <param name="uid">The UID of the message.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		Task<HeaderList> GetHeadersAsync (UniqueId uid, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Get the specified body part headers.
+		/// </summary>
+		/// <remarks>
+		/// Gets the specified body part headers.
+		/// </remarks>
+		/// <returns>The body part headers.</returns>
+		/// <param name="uid">The UID of the message.</param>
+		/// <param name="part">The body part.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		HeaderList GetHeaders (UniqueId uid, BodyPart part, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously get the specified body part headers.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously gets the specified body part headers.
+		/// </remarks>
+		/// <returns>The body part headers.</returns>
+		/// <param name="uid">The UID of the message.</param>
+		/// <param name="part">The body part.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		Task<HeaderList> GetHeadersAsync (UniqueId uid, BodyPart part, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Get the specified message headers.
+		/// </summary>
+		/// <remarks>
+		/// Gets the specified message headers.
+		/// </remarks>
+		/// <returns>The message headers.</returns>
+		/// <param name="index">The index of the message.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		HeaderList GetHeaders (int index, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously get the specified message headers.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously gets the specified message headers.
+		/// </remarks>
+		/// <returns>The message headers.</returns>
+		/// <param name="index">The index of the message.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		Task<HeaderList> GetHeadersAsync (int index, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Get the specified body part headers.
+		/// </summary>
+		/// <remarks>
+		/// Gets the specified body part headers.
+		/// </remarks>
+		/// <returns>The body part headers.</returns>
+		/// <param name="index">The index of the message.</param>
+		/// <param name="part">The body part.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		HeaderList GetHeaders (int index, BodyPart part, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
+
+		/// <summary>
+		/// Asynchronously get the specified body part headers.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously gets the specified body part headers.
+		/// </remarks>
+		/// <returns>The body part headers.</returns>
+		/// <param name="index">The index of the message.</param>
+		/// <param name="part">The body part.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <param name="progress">The progress reporting mechanism.</param>
+		Task<HeaderList> GetHeadersAsync (int index, BodyPart part, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
 
 		/// <summary>
 		/// Get the specified message.
@@ -2038,6 +2697,9 @@ namespace MailKit {
 		/// <remarks>
 		/// Gets the specified body part.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\ImapExamples.cs" region="DownloadBodyParts"/>
+		/// </example>
 		/// <returns>The body part.</returns>
 		/// <param name="uid">The UID of the message.</param>
 		/// <param name="part">The body part.</param>
@@ -2065,34 +2727,6 @@ namespace MailKit {
 		/// Gets the specified body part.
 		/// </remarks>
 		/// <returns>The body part.</returns>
-		/// <param name="uid">The UID of the message.</param>
-		/// <param name="part">The body part.</param>
-		/// <param name="headersOnly"><c>true</c> if only the headers should be downloaded; otherwise, <c>false</c>></param>
-		/// <param name="cancellationToken">The cancellation token.</param>
-		/// <param name="progress">The progress reporting mechanism.</param>
-		MimeEntity GetBodyPart (UniqueId uid, BodyPart part, bool headersOnly, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
-
-		/// <summary>
-		/// Asynchronously get the specified body part.
-		/// </summary>
-		/// <remarks>
-		/// Asynchronously gets the specified body part.
-		/// </remarks>
-		/// <returns>The body part.</returns>
-		/// <param name="uid">The UID of the message.</param>
-		/// <param name="part">The body part.</param>
-		/// <param name="headersOnly"><c>true</c> if only the headers should be downloaded; otherwise, <c>false</c>></param>
-		/// <param name="cancellationToken">The cancellation token.</param>
-		/// <param name="progress">The progress reporting mechanism.</param>
-		Task<MimeEntity> GetBodyPartAsync (UniqueId uid, BodyPart part, bool headersOnly, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
-
-		/// <summary>
-		/// Get the specified body part.
-		/// </summary>
-		/// <remarks>
-		/// Gets the specified body part.
-		/// </remarks>
-		/// <returns>The body part.</returns>
 		/// <param name="index">The index of the message.</param>
 		/// <param name="part">The body part.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
@@ -2111,34 +2745,6 @@ namespace MailKit {
 		/// <param name="cancellationToken">The cancellation token.</param>
 		/// <param name="progress">The progress reporting mechanism.</param>
 		Task<MimeEntity> GetBodyPartAsync (int index, BodyPart part, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
-
-		/// <summary>
-		/// Get the specified body part.
-		/// </summary>
-		/// <remarks>
-		/// Gets the specified body part.
-		/// </remarks>
-		/// <returns>The body part.</returns>
-		/// <param name="index">The index of the message.</param>
-		/// <param name="part">The body part.</param>
-		/// <param name="headersOnly"><c>true</c> if only the headers should be downloaded; otherwise, <c>false</c>></param>
-		/// <param name="cancellationToken">The cancellation token.</param>
-		/// <param name="progress">The progress reporting mechanism.</param>
-		MimeEntity GetBodyPart (int index, BodyPart part, bool headersOnly, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
-
-		/// <summary>
-		/// Asynchronously get the specified body part.
-		/// </summary>
-		/// <remarks>
-		/// Asynchronously gets the specified body part.
-		/// </remarks>
-		/// <returns>The body part.</returns>
-		/// <param name="index">The index of the message.</param>
-		/// <param name="part">The body part.</param>
-		/// <param name="headersOnly"><c>true</c> if only the headers should be downloaded; otherwise, <c>false</c>></param>
-		/// <param name="cancellationToken">The cancellation token.</param>
-		/// <param name="progress">The progress reporting mechanism.</param>
-		Task<MimeEntity> GetBodyPartAsync (int index, BodyPart part, bool headersOnly, CancellationToken cancellationToken = default (CancellationToken), ITransferProgress progress = null);
 
 		/// <summary>
 		/// Get a substream of the specified message.
@@ -2453,10 +3059,10 @@ namespace MailKit {
 		/// </remarks>
 		/// <param name="uid">The UID of the message.</param>
 		/// <param name="flags">The message flags to add.</param>
-		/// <param name="userFlags">A set of user-defined flags to add.</param>
+		/// <param name="keywords">A set of user-defined flags to add.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		void AddFlags (UniqueId uid, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		void AddFlags (UniqueId uid, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously add a set of flags to the specified message.
@@ -2467,10 +3073,10 @@ namespace MailKit {
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="uid">The UIDs of the message.</param>
 		/// <param name="flags">The message flags to add.</param>
-		/// <param name="userFlags">A set of user-defined flags to add.</param>
+		/// <param name="keywords">A set of user-defined flags to add.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task AddFlagsAsync (UniqueId uid, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task AddFlagsAsync (UniqueId uid, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Add a set of flags to the specified messages.
@@ -2505,10 +3111,10 @@ namespace MailKit {
 		/// </remarks>
 		/// <param name="uids">The UIDs of the messages.</param>
 		/// <param name="flags">The message flags to add.</param>
-		/// <param name="userFlags">A set of user-defined flags to add.</param>
+		/// <param name="keywords">A set of user-defined flags to add.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		void AddFlags (IList<UniqueId> uids, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		void AddFlags (IList<UniqueId> uids, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously add a set of flags to the specified messages.
@@ -2519,10 +3125,10 @@ namespace MailKit {
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="uids">The UIDs of the messages.</param>
 		/// <param name="flags">The message flags to add.</param>
-		/// <param name="userFlags">A set of user-defined flags to add.</param>
+		/// <param name="keywords">A set of user-defined flags to add.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task AddFlagsAsync (IList<UniqueId> uids, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task AddFlagsAsync (IList<UniqueId> uids, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Remove a set of flags from the specified message.
@@ -2557,10 +3163,10 @@ namespace MailKit {
 		/// </remarks>
 		/// <param name="uid">The UID of the message.</param>
 		/// <param name="flags">The message flags to remove.</param>
-		/// <param name="userFlags">A set of user-defined flags to remove.</param>
+		/// <param name="keywords">A set of user-defined flags to remove.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		void RemoveFlags (UniqueId uid, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		void RemoveFlags (UniqueId uid, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously remove a set of flags from the specified message.
@@ -2571,10 +3177,10 @@ namespace MailKit {
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="uid">The UID of the message.</param>
 		/// <param name="flags">The message flags to remove.</param>
-		/// <param name="userFlags">A set of user-defined flags to remove.</param>
+		/// <param name="keywords">A set of user-defined flags to remove.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task RemoveFlagsAsync (UniqueId uid, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task RemoveFlagsAsync (UniqueId uid, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Remove a set of flags from the specified messages.
@@ -2609,10 +3215,10 @@ namespace MailKit {
 		/// </remarks>
 		/// <param name="uids">The UIDs of the messages.</param>
 		/// <param name="flags">The message flags to remove.</param>
-		/// <param name="userFlags">A set of user-defined flags to remove.</param>
+		/// <param name="keywords">A set of user-defined flags to remove.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		void RemoveFlags (IList<UniqueId> uids, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		void RemoveFlags (IList<UniqueId> uids, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously remove a set of flags from the specified messages.
@@ -2623,10 +3229,10 @@ namespace MailKit {
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="uids">The UIDs of the messages.</param>
 		/// <param name="flags">The message flags to remove.</param>
-		/// <param name="userFlags">A set of user-defined flags to remove.</param>
+		/// <param name="keywords">A set of user-defined flags to remove.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task RemoveFlagsAsync (IList<UniqueId> uids, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task RemoveFlagsAsync (IList<UniqueId> uids, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Set the flags of the specified message.
@@ -2661,10 +3267,10 @@ namespace MailKit {
 		/// </remarks>
 		/// <param name="uid">The UID of the message.</param>
 		/// <param name="flags">The message flags to set.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		void SetFlags (UniqueId uid, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		void SetFlags (UniqueId uid, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously set the flags of the specified message.
@@ -2675,10 +3281,10 @@ namespace MailKit {
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="uid">The UID of the message.</param>
 		/// <param name="flags">The message flags to set.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task SetFlagsAsync (UniqueId uid, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task SetFlagsAsync (UniqueId uid, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Set the flags of the specified messages.
@@ -2713,10 +3319,10 @@ namespace MailKit {
 		/// </remarks>
 		/// <param name="uids">The UIDs of the messages.</param>
 		/// <param name="flags">The message flags to set.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		void SetFlags (IList<UniqueId> uids, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		void SetFlags (IList<UniqueId> uids, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously set the flags of the specified messages.
@@ -2727,10 +3333,10 @@ namespace MailKit {
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="uids">The UIDs of the messages.</param>
 		/// <param name="flags">The message flags to set.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task SetFlagsAsync (IList<UniqueId> uids, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task SetFlagsAsync (IList<UniqueId> uids, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Add a set of flags to the specified messages only if their mod-sequence value is less than the specified value.
@@ -2770,10 +3376,10 @@ namespace MailKit {
 		/// <param name="uids">The UIDs of the messages.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="flags">The message flags to add.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<UniqueId> AddFlags (IList<UniqueId> uids, ulong modseq, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		IList<UniqueId> AddFlags (IList<UniqueId> uids, ulong modseq, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously add a set of flags to the specified messages only if their mod-sequence value is less than the specified value.
@@ -2785,10 +3391,10 @@ namespace MailKit {
 		/// <param name="uids">The UIDs of the messages.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="flags">The message flags to add.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<UniqueId>> AddFlagsAsync (IList<UniqueId> uids, ulong modseq, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<UniqueId>> AddFlagsAsync (IList<UniqueId> uids, ulong modseq, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Remove a set of flags from the specified messages only if their mod-sequence value is less than the specified value.
@@ -2828,10 +3434,10 @@ namespace MailKit {
 		/// <param name="uids">The UIDs of the messages.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="flags">The message flags to remove.</param>
-		/// <param name="userFlags">A set of user-defined flags to remove.</param>
+		/// <param name="keywords">A set of user-defined flags to remove.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<UniqueId> RemoveFlags (IList<UniqueId> uids, ulong modseq, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		IList<UniqueId> RemoveFlags (IList<UniqueId> uids, ulong modseq, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously remove a set of flags from the specified messages only if their mod-sequence value is less than the specified value.
@@ -2843,10 +3449,10 @@ namespace MailKit {
 		/// <param name="uids">The UIDs of the messages.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="flags">The message flags to remove.</param>
-		/// <param name="userFlags">A set of user-defined flags to remove.</param>
+		/// <param name="keywords">A set of user-defined flags to remove.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<UniqueId>> RemoveFlagsAsync (IList<UniqueId> uids, ulong modseq, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<UniqueId>> RemoveFlagsAsync (IList<UniqueId> uids, ulong modseq, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Set the flags of the specified messages only if their mod-sequence value is less than the specified value.
@@ -2886,10 +3492,10 @@ namespace MailKit {
 		/// <param name="uids">The UIDs of the messages.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="flags">The message flags to set.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<UniqueId> SetFlags (IList<UniqueId> uids, ulong modseq, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		IList<UniqueId> SetFlags (IList<UniqueId> uids, ulong modseq, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously set the flags of the specified messages only if their mod-sequence value is less than the specified value.
@@ -2901,10 +3507,10 @@ namespace MailKit {
 		/// <param name="uids">The UIDs of the messages.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="flags">The message flags to set.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<UniqueId>> SetFlagsAsync (IList<UniqueId> uids, ulong modseq, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<UniqueId>> SetFlagsAsync (IList<UniqueId> uids, ulong modseq, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Add a set of flags to the specified message.
@@ -2939,10 +3545,10 @@ namespace MailKit {
 		/// </remarks>
 		/// <param name="index">The index of the message.</param>
 		/// <param name="flags">The message flags to add.</param>
-		/// <param name="userFlags">A set of user-defined flags to add.</param>
+		/// <param name="keywords">A set of user-defined flags to add.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		void AddFlags (int index, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		void AddFlags (int index, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously add a set of flags to the specified message.
@@ -2953,10 +3559,10 @@ namespace MailKit {
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="index">The index of the message.</param>
 		/// <param name="flags">The message flags to add.</param>
-		/// <param name="userFlags">A set of user-defined flags to add.</param>
+		/// <param name="keywords">A set of user-defined flags to add.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task AddFlagsAsync (int index, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task AddFlagsAsync (int index, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Add a set of flags to the specified messages.
@@ -2991,10 +3597,10 @@ namespace MailKit {
 		/// </remarks>
 		/// <param name="indexes">The indexes of the messages.</param>
 		/// <param name="flags">The message flags to add.</param>
-		/// <param name="userFlags">A set of user-defined flags to add.</param>
+		/// <param name="keywords">A set of user-defined flags to add.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		void AddFlags (IList<int> indexes, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		void AddFlags (IList<int> indexes, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously add a set of flags to the specified messages.
@@ -3005,10 +3611,10 @@ namespace MailKit {
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="indexes">The indexes of the messages.</param>
 		/// <param name="flags">The message flags to add.</param>
-		/// <param name="userFlags">A set of user-defined flags to add.</param>
+		/// <param name="keywords">A set of user-defined flags to add.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task AddFlagsAsync (IList<int> indexes, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task AddFlagsAsync (IList<int> indexes, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Remove a set of flags from the specified message.
@@ -3043,10 +3649,10 @@ namespace MailKit {
 		/// </remarks>
 		/// <param name="index">The index of the message.</param>
 		/// <param name="flags">The message flags to remove.</param>
-		/// <param name="userFlags">A set of user-defined flags to remove.</param>
+		/// <param name="keywords">A set of user-defined flags to remove.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		void RemoveFlags (int index, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		void RemoveFlags (int index, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously remove a set of flags from the specified message.
@@ -3057,10 +3663,10 @@ namespace MailKit {
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="index">The index of the message.</param>
 		/// <param name="flags">The message flags to remove.</param>
-		/// <param name="userFlags">A set of user-defined flags to remove.</param>
+		/// <param name="keywords">A set of user-defined flags to remove.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task RemoveFlagsAsync (int index, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task RemoveFlagsAsync (int index, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Remove a set of flags from the specified messages.
@@ -3095,10 +3701,10 @@ namespace MailKit {
 		/// </remarks>
 		/// <param name="indexes">The indexes of the messages.</param>
 		/// <param name="flags">The message flags to remove.</param>
-		/// <param name="userFlags">A set of user-defined flags to remove.</param>
+		/// <param name="keywords">A set of user-defined flags to remove.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		void RemoveFlags (IList<int> indexes, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		void RemoveFlags (IList<int> indexes, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously remove a set of flags from the specified messages.
@@ -3109,10 +3715,10 @@ namespace MailKit {
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="indexes">The indexes of the messages.</param>
 		/// <param name="flags">The message flags to remove.</param>
-		/// <param name="userFlags">A set of user-defined flags to remove.</param>
+		/// <param name="keywords">A set of user-defined flags to remove.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task RemoveFlagsAsync (IList<int> indexes, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task RemoveFlagsAsync (IList<int> indexes, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Set the flags of the specified message.
@@ -3147,10 +3753,10 @@ namespace MailKit {
 		/// </remarks>
 		/// <param name="index">The index of the message.</param>
 		/// <param name="flags">The message flags to set.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		void SetFlags (int index, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		void SetFlags (int index, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously set the flags of the specified message.
@@ -3161,10 +3767,10 @@ namespace MailKit {
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="index">The index of the message.</param>
 		/// <param name="flags">The message flags to set.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task SetFlagsAsync (int index, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task SetFlagsAsync (int index, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Set the flags of the specified messages.
@@ -3199,10 +3805,10 @@ namespace MailKit {
 		/// </remarks>
 		/// <param name="indexes">The indexes of the messages.</param>
 		/// <param name="flags">The message flags to set.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		void SetFlags (IList<int> indexes, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		void SetFlags (IList<int> indexes, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously set the flags of the specified messages.
@@ -3213,10 +3819,10 @@ namespace MailKit {
 		/// <returns>An asynchronous task context.</returns>
 		/// <param name="indexes">The indexes of the messages.</param>
 		/// <param name="flags">The message flags to set.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task SetFlagsAsync (IList<int> indexes, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task SetFlagsAsync (IList<int> indexes, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Add a set of flags to the specified messages only if their mod-sequence value is less than the specified value.
@@ -3256,10 +3862,10 @@ namespace MailKit {
 		/// <param name="indexes">The indexes of the messages.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="flags">The message flags to add.</param>
-		/// <param name="userFlags">A set of user-defined flags to add.</param>
+		/// <param name="keywords">A set of user-defined flags to add.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<int> AddFlags (IList<int> indexes, ulong modseq, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		IList<int> AddFlags (IList<int> indexes, ulong modseq, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously add a set of flags to the specified messages only if their mod-sequence value is less than the specified value.
@@ -3271,10 +3877,10 @@ namespace MailKit {
 		/// <param name="indexes">The indexes of the messages.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="flags">The message flags to add.</param>
-		/// <param name="userFlags">A set of user-defined flags to add.</param>
+		/// <param name="keywords">A set of user-defined flags to add.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<int>> AddFlagsAsync (IList<int> indexes, ulong modseq, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<int>> AddFlagsAsync (IList<int> indexes, ulong modseq, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Remove a set of flags from the specified messages only if their mod-sequence value is less than the specified value.
@@ -3314,10 +3920,10 @@ namespace MailKit {
 		/// <param name="indexes">The indexes of the messages.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="flags">The message flags to remove.</param>
-		/// <param name="userFlags">A set of user-defined flags to remove.</param>
+		/// <param name="keywords">A set of user-defined flags to remove.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<int> RemoveFlags (IList<int> indexes, ulong modseq, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		IList<int> RemoveFlags (IList<int> indexes, ulong modseq, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously remove a set of flags from the specified messages only if their mod-sequence value is less than the specified value.
@@ -3329,10 +3935,10 @@ namespace MailKit {
 		/// <param name="indexes">The indexes of the messages.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="flags">The message flags to remove.</param>
-		/// <param name="userFlags">A set of user-defined flags to remove.</param>
+		/// <param name="keywords">A set of user-defined flags to remove.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<int>> RemoveFlagsAsync (IList<int> indexes, ulong modseq, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<int>> RemoveFlagsAsync (IList<int> indexes, ulong modseq, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Set the flags of the specified messages only if their mod-sequence value is less than the specified value.
@@ -3372,10 +3978,10 @@ namespace MailKit {
 		/// <param name="indexes">The indexes of the messages.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="flags">The message flags to set.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<int> SetFlags (IList<int> indexes, ulong modseq, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		IList<int> SetFlags (IList<int> indexes, ulong modseq, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Asynchronously set the flags of the specified messages only if their mod-sequence value is less than the specified value.
@@ -3387,10 +3993,10 @@ namespace MailKit {
 		/// <param name="indexes">The indexes of the messages.</param>
 		/// <param name="modseq">The mod-sequence value.</param>
 		/// <param name="flags">The message flags to set.</param>
-		/// <param name="userFlags">A set of user-defined flags to set.</param>
+		/// <param name="keywords">A set of user-defined flags to set.</param>
 		/// <param name="silent">If set to <c>true</c>, no <see cref="MessageFlagsChanged"/> events will be emitted.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<int>> SetFlagsAsync (IList<int> indexes, ulong modseq, MessageFlags flags, HashSet<string> userFlags, bool silent, CancellationToken cancellationToken = default (CancellationToken));
+		Task<IList<int>> SetFlagsAsync (IList<int> indexes, ulong modseq, MessageFlags flags, HashSet<string> keywords, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Add a set of labels to the specified message.
@@ -3861,6 +4467,150 @@ namespace MailKit {
 		Task<IList<int>> SetLabelsAsync (IList<int> indexes, ulong modseq, IList<string> labels, bool silent, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
+		/// Store the annotations for the specified message.
+		/// </summary>
+		/// <remarks>
+		/// Stores the annotations for the specified message.
+		/// </remarks>
+		/// <param name="uid">The UID of the message.</param>
+		/// <param name="annotations">The annotations to store.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		void Store (UniqueId uid, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously store the annotations for the specified message.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously stores the annotations for the specified message.
+		/// </remarks>
+		/// <returns>An asynchronous task context.</returns>
+		/// <param name="uid">The UID of the message.</param>
+		/// <param name="annotations">The annotations to store.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task StoreAsync (UniqueId uid, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Store the annotations for the specified messages.
+		/// </summary>
+		/// <remarks>
+		/// Stores the annotations for the specified messages.
+		/// </remarks>
+		/// <param name="uids">The UIDs of the messages.</param>
+		/// <param name="annotations">The annotations to store.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		void Store (IList<UniqueId> uids, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously store the annotations for the specified messages.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously stores the annotations for the specified messages.
+		/// </remarks>
+		/// <returns>An asynchronous task context.</returns>
+		/// <param name="uids">The UIDs of the messages.</param>
+		/// <param name="annotations">The annotations to store.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task StoreAsync (IList<UniqueId> uids, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Store the annotations for the specified messages only if their mod-sequence value is less than the specified value.
+		/// </summary>
+		/// <remarks>
+		/// Stores the annotations for the specified messages only if their mod-sequence value is less than the specified value.
+		/// </remarks>
+		/// <returns>The unique IDs of the messages that were not updated.</returns>
+		/// <param name="uids">The UIDs of the messages.</param>
+		/// <param name="modseq">The mod-sequence value.</param>
+		/// <param name="annotations">The annotations to store.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		IList<UniqueId> Store (IList<UniqueId> uids, ulong modseq, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously store the annotations for the specified messages only if their mod-sequence value is less than the specified value.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously stores the annotations for the specified messages only if their mod-sequence value is less than the specified value.
+		/// </remarks>
+		/// <returns>The unique IDs of the messages that were not updated.</returns>
+		/// <param name="uids">The UIDs of the messages.</param>
+		/// <param name="modseq">The mod-sequence value.</param>
+		/// <param name="annotations">The annotations to store.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task<IList<UniqueId>> StoreAsync (IList<UniqueId> uids, ulong modseq, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Store the annotations for the specified message.
+		/// </summary>
+		/// <remarks>
+		/// Stores the annotations for the specified message.
+		/// </remarks>
+		/// <param name="index">The index of the message.</param>
+		/// <param name="annotations">The annotations to store.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		void Store (int index, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously store the annotations for the specified message.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously stores the annotations for the specified message.
+		/// </remarks>
+		/// <returns>An asynchronous task context.</returns>
+		/// <param name="index">The indexes of the message.</param>
+		/// <param name="annotations">The annotations to store.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task StoreAsync (int index, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Store the annotations for the specified messages.
+		/// </summary>
+		/// <remarks>
+		/// Stores the annotations for the specified messages.
+		/// </remarks>
+		/// <param name="indexes">The indexes of the messages.</param>
+		/// <param name="annotations">The annotations to store.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		void Store (IList<int> indexes, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously store the annotations for the specified messages.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously stores the annotations for the specified messages.
+		/// </remarks>
+		/// <returns>An asynchronous task context.</returns>
+		/// <param name="indexes">The indexes of the messages.</param>
+		/// <param name="annotations">The annotations to store.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task StoreAsync (IList<int> indexes, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Store the annotations for the specified messages only if their mod-sequence value is less than the specified value.
+		/// </summary>
+		/// <remarks>
+		/// Stores the annotations for the specified messages only if their mod-sequence value is less than the specified value.
+		/// </remarks>
+		/// <returns>The indexes of the messages that were not updated.</returns>
+		/// <param name="indexes">The indexes of the messages.</param>
+		/// <param name="modseq">The mod-sequence value.</param>
+		/// <param name="annotations">The annotations to store.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		IList<int> Store (IList<int> indexes, ulong modseq, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously store the annotations for the specified messages only if their mod-sequence value is less than the specified value.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously stores the annotations for the specified messages only if their mod-sequence value is less than the specified value.s
+		/// </remarks>
+		/// <returns>The indexes of the messages that were not updated.</returns>
+		/// <param name="indexes">The indexes of the messages.</param>
+		/// <param name="modseq">The mod-sequence value.</param>
+		/// <param name="annotations">The annotations to store.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task<IList<int>> StoreAsync (IList<int> indexes, ulong modseq, IList<Annotation> annotations, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
 		/// Search the folder for messages matching the specified query.
 		/// </summary>
 		/// <remarks>
@@ -3883,34 +4633,6 @@ namespace MailKit {
 		/// <param name="query">The search query.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
 		Task<IList<UniqueId>> SearchAsync (SearchQuery query, CancellationToken cancellationToken = default (CancellationToken));
-
-		/// <summary>
-		/// Search the folder for messages matching the specified query,
-		/// returning them in the preferred sort order.
-		/// </summary>
-		/// <remarks>
-		/// The returned array of unique identifiers will be sorted in the preferred order and
-		/// can be used with <see cref="IMailFolder.GetMessage(UniqueId,CancellationToken,ITransferProgress)"/>.
-		/// </remarks>
-		/// <returns>An array of matching UIDs in the specified sort order.</returns>
-		/// <param name="query">The search query.</param>
-		/// <param name="orderBy">The sort order.</param>
-		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<UniqueId> Search (SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
-
-		/// <summary>
-		/// Asynchronously search the folder for messages matching the specified query,
-		/// returning them in the preferred sort order.
-		/// </summary>
-		/// <remarks>
-		/// The returned array of unique identifiers will be sorted in the preferred order and
-		/// can be used with <see cref="IMailFolder.GetMessage(UniqueId,CancellationToken,ITransferProgress)"/>.
-		/// </remarks>
-		/// <returns>An array of matching UIDs in the specified sort order.</returns>
-		/// <param name="query">The search query.</param>
-		/// <param name="orderBy">The sort order.</param>
-		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<UniqueId>> SearchAsync (SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Search the subset of UIDs in the folder for messages matching the specified query.
@@ -3939,36 +4661,6 @@ namespace MailKit {
 		Task<IList<UniqueId>> SearchAsync (IList<UniqueId> uids, SearchQuery query, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
-		/// Search the subset of UIDs in the folder for messages matching the specified query,
-		/// returning them in the preferred sort order.
-		/// </summary>
-		/// <remarks>
-		/// The returned array of unique identifiers will be sorted in the preferred order and
-		/// can be used with <see cref="IMailFolder.GetMessage(UniqueId,CancellationToken,ITransferProgress)"/>.
-		/// </remarks>
-		/// <returns>An array of matching UIDs in the specified sort order.</returns>
-		/// <param name="uids">The subset of UIDs</param>
-		/// <param name="query">The search query.</param>
-		/// <param name="orderBy">The sort order.</param>
-		/// <param name="cancellationToken">The cancellation token.</param>
-		IList<UniqueId> Search (IList<UniqueId> uids, SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
-
-		/// <summary>
-		/// Asynchronously search the subset of UIDs in the folder for messages matching the specified query,
-		/// returning them in the preferred sort order.
-		/// </summary>
-		/// <remarks>
-		/// The returned array of unique identifiers will be sorted in the preferred order and
-		/// can be used with <see cref="IMailFolder.GetMessage(UniqueId,CancellationToken,ITransferProgress)"/>.
-		/// </remarks>
-		/// <returns>An array of matching UIDs in the specified sort order.</returns>
-		/// <param name="uids">The subset of UIDs</param>
-		/// <param name="query">The search query.</param>
-		/// <param name="orderBy">The sort order.</param>
-		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<IList<UniqueId>> SearchAsync (IList<UniqueId> uids, SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
-
-		/// <summary>
 		/// Search the folder for messages matching the specified query.
 		/// </summary>
 		/// <remarks>
@@ -3995,37 +4687,7 @@ namespace MailKit {
 		Task<SearchResults> SearchAsync (SearchOptions options, SearchQuery query, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
-		/// Searches the folder for messages matching the specified query,
-		/// returning them in the preferred sort order.
-		/// </summary>
-		/// <remarks>
-		/// Searches the folder for messages matching the specified query and ordering,
-		/// returning only the requested search results.
-		/// </remarks>
-		/// <returns>The search results.</returns>
-		/// <param name="options">The search options.</param>
-		/// <param name="query">The search query.</param>
-		/// <param name="orderBy">The sort order.</param>
-		/// <param name="cancellationToken">The cancellation token.</param>
-		SearchResults Search (SearchOptions options, SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
-
-		/// <summary>
-		/// Asynchronously searches the folder for messages matching the specified query,
-		/// returning them in the preferred sort order.
-		/// </summary>
-		/// <remarks>
-		/// Asynchronously searches the folder for messages matching the specified query and ordering,
-		/// returning only the requested search results.
-		/// </remarks>
-		/// <returns>The search results.</returns>
-		/// <param name="options">The search options.</param>
-		/// <param name="query">The search query.</param>
-		/// <param name="orderBy">The sort order.</param>
-		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<SearchResults> SearchAsync (SearchOptions options, SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
-
-		/// <summary>
-		/// Searches the subset of UIDs in the folder for messages matching the specified query.
+		/// Search the subset of UIDs in the folder for messages matching the specified query.
 		/// </summary>
 		/// <remarks>
 		/// Searches the fsubset of UIDs in the folder for messages matching the specified query,
@@ -4039,7 +4701,7 @@ namespace MailKit {
 		SearchResults Search (SearchOptions options, IList<UniqueId> uids, SearchQuery query, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
-		/// Asynchronously searches the subset of UIDs in the folder for messages matching the specified query.
+		/// Asynchronously search the subset of UIDs in the folder for messages matching the specified query.
 		/// </summary>
 		/// <remarks>
 		/// Asynchronously searches the fsubset of UIDs in the folder for messages matching the specified query,
@@ -4053,28 +4715,90 @@ namespace MailKit {
 		Task<SearchResults> SearchAsync (SearchOptions options, IList<UniqueId> uids, SearchQuery query, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
-		/// Searches the subset of UIDs in the folder for messages matching the specified query,
-		/// returning them in the preferred sort order.
+		/// Sort messages matching the specified query.
 		/// </summary>
 		/// <remarks>
-		/// Searches the folder for messages matching the specified query and ordering,
-		/// returning only the requested search results.
+		/// The returned array of unique identifiers will be sorted in the preferred order and
+		/// can be used with <see cref="IMailFolder.GetMessage(UniqueId,CancellationToken,ITransferProgress)"/>.
 		/// </remarks>
-		/// <returns>The search results.</returns>
-		/// <param name="options">The search options.</param>
-		/// <param name="uids">The subset of UIDs</param>
+		/// <returns>An array of matching UIDs in the specified sort order.</returns>
 		/// <param name="query">The search query.</param>
 		/// <param name="orderBy">The sort order.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		SearchResults Search (SearchOptions options, IList<UniqueId> uids, SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
+		IList<UniqueId> Sort (SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
-		/// Asynchronously searches the subset of UIDs in the folder for messages matching the specified query,
-		/// returning them in the preferred sort order.
+		/// Asynchronously sort messages matching the specified query.
 		/// </summary>
 		/// <remarks>
-		/// Asynchronously searches the folder for messages matching the specified query and ordering,
-		/// returning only the requested search results.
+		/// The returned array of unique identifiers will be sorted in the preferred order and
+		/// can be used with <see cref="IMailFolder.GetMessage(UniqueId,CancellationToken,ITransferProgress)"/>.
+		/// </remarks>
+		/// <returns>An array of matching UIDs in the specified sort order.</returns>
+		/// <param name="query">The search query.</param>
+		/// <param name="orderBy">The sort order.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task<IList<UniqueId>> SortAsync (SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Sort messages matching the specified query.
+		/// </summary>
+		/// <remarks>
+		/// The returned array of unique identifiers will be sorted in the preferred order and
+		/// can be used with <see cref="IMailFolder.GetMessage(UniqueId,CancellationToken,ITransferProgress)"/>.
+		/// </remarks>
+		/// <returns>An array of matching UIDs in the specified sort order.</returns>
+		/// <param name="uids">The subset of UIDs</param>
+		/// <param name="query">The search query.</param>
+		/// <param name="orderBy">The sort order.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		IList<UniqueId> Sort (IList<UniqueId> uids, SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously sort messages matching the specified query.
+		/// </summary>
+		/// <remarks>
+		/// The returned array of unique identifiers will be sorted in the preferred order and
+		/// can be used with <see cref="IMailFolder.GetMessage(UniqueId,CancellationToken,ITransferProgress)"/>.
+		/// </remarks>
+		/// <returns>An array of matching UIDs in the specified sort order.</returns>
+		/// <param name="uids">The subset of UIDs</param>
+		/// <param name="query">The search query.</param>
+		/// <param name="orderBy">The sort order.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task<IList<UniqueId>> SortAsync (IList<UniqueId> uids, SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Sort messages matching the specified query.
+		/// </summary>
+		/// <remarks>
+		/// Searches the folder for messages matching the specified query, returning the search results in the specified sort order.
+		/// </remarks>
+		/// <returns>The search results.</returns>
+		/// <param name="options">The search options.</param>
+		/// <param name="query">The search query.</param>
+		/// <param name="orderBy">The sort order.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		SearchResults Sort (SearchOptions options, SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously sort messages matching the specified query.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously searches the folder for messages matching the specified query, returning the search results in the specified sort order.
+		/// </remarks>
+		/// <returns>The search results.</returns>
+		/// <param name="options">The search options.</param>
+		/// <param name="query">The search query.</param>
+		/// <param name="orderBy">The sort order.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task<SearchResults> SortAsync (SearchOptions options, SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Sort messages matching the specified query.
+		/// </summary>
+		/// <remarks>
+		/// Searches the folder for messages matching the specified query, returning the search results in the specified sort order.
 		/// </remarks>
 		/// <returns>The search results.</returns>
 		/// <param name="options">The search options.</param>
@@ -4082,7 +4806,22 @@ namespace MailKit {
 		/// <param name="query">The search query.</param>
 		/// <param name="orderBy">The sort order.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		Task<SearchResults> SearchAsync (SearchOptions options, IList<UniqueId> uids, SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
+		SearchResults Sort (SearchOptions options, IList<UniqueId> uids, SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
+
+		/// <summary>
+		/// Asynchronously sort messages matching the specified query.
+		/// </summary>
+		/// <remarks>
+		/// Asynchronously searches the folder for messages matching the specified query,
+		/// returning the search results in the specified sort order.
+		/// </remarks>
+		/// <returns>The search results.</returns>
+		/// <param name="options">The search options.</param>
+		/// <param name="uids">The subset of UIDs</param>
+		/// <param name="query">The search query.</param>
+		/// <param name="orderBy">The sort order.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		Task<SearchResults> SortAsync (SearchOptions options, IList<UniqueId> uids, SearchQuery query, IList<OrderBy> orderBy, CancellationToken cancellationToken = default (CancellationToken));
 
 		/// <summary>
 		/// Thread the messages in the folder that match the search query using the specified threading algorithm.
@@ -4192,15 +4931,10 @@ namespace MailKit {
 		/// <remarks>
 		/// Emitted when a message is expunged from the folder.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\ImapIdleExample.cs"/>
+		/// </example>
 		event EventHandler<MessageEventArgs> MessageExpunged;
-
-		/// <summary>
-		/// Occurs when new messages arrive in the folder.
-		/// </summary>
-		/// <remarks>
-		/// Emitted when new mmessages arrive in the folder.
-		/// </remarks>
-		event EventHandler<MessagesArrivedEventArgs> MessagesArrived;
 
 		/// <summary>
 		/// Occurs when messages vanish from the folder.
@@ -4216,6 +4950,9 @@ namespace MailKit {
 		/// <remarks>
 		/// Emitted when flags changed on a message.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\ImapIdleExample.cs"/>
+		/// </example>
 		event EventHandler<MessageFlagsChangedEventArgs> MessageFlagsChanged;
 
 		/// <summary>
@@ -4225,6 +4962,14 @@ namespace MailKit {
 		/// Emitted when labels changed on a message.
 		/// </remarks>
 		event EventHandler<MessageLabelsChangedEventArgs> MessageLabelsChanged;
+
+		/// <summary>
+		/// Occurs when annotations changed on a message.
+		/// </summary>
+		/// <remarks>
+		/// Emitted when annotations changed on a message.
+		/// </remarks>
+		event EventHandler<AnnotationsChangedEventArgs> AnnotationsChanged;
 
 		/// <summary>
 		/// Occurs when a message summary is fetched from the folder.
@@ -4238,36 +4983,95 @@ namespace MailKit {
 		/// inefficient. To alleviate this potential problem, this event will be emitted
 		/// as soon as the <see cref="IMailFolder"/> successfully retrieves the complete
 		/// <see cref="IMessageSummary"/> for each requested message.</para>
-		/// <para>Note: The Fetch methods will return a list of all message summaries
-		/// that any information was retrieved for, regardless of whether or not all of
-		/// the requested items were fetched, therefore there may be a discrepency between
-		/// the number of times this event is emitetd and the number of summary items
-		/// returned from the Fetch method.</para>
+		/// <note type="note">The <a href="Overload_MailKit_IMailFolder_Fetch.htm">Fetch</a>
+		/// methods will return a list of all message summaries that any information was
+		/// retrieved for, regardless of whether or not all of the requested items were fetched,
+		/// therefore there may be a discrepency between the number of times this event is
+		/// emitetd and the number of summary items returned from the Fetch method.</note>
 		/// </remarks>
 		event EventHandler<MessageSummaryFetchedEventArgs> MessageSummaryFetched;
+
+		/// <summary>
+		/// Occurs when metadata changes.
+		/// </summary>
+		/// <remarks>
+		/// The <see cref="MetadataChanged"/> event is emitted when metadata changes.
+		/// </remarks>
+		event EventHandler<MetadataChangedEventArgs> MetadataChanged;
+
+		/// <summary>
+		/// Occurs when the mod-sequence changed on a message.
+		/// </summary>
+		/// <remarks>
+		/// Emitted when the mod-sequence changed on a message.
+		/// </remarks>
+		event EventHandler<ModSeqChangedEventArgs> ModSeqChanged;
+
+		/// <summary>
+		/// Occurs when the highest mod-sequence changes.
+		/// </summary>
+		/// <remarks>
+		/// The <see cref="HighestModSeqChanged"/> event is emitted whenever the <see cref="HighestModSeq"/> value changes.
+		/// </remarks>
+		event EventHandler<EventArgs> HighestModSeqChanged;
+
+		/// <summary>
+		/// Occurs when the next UID changes.
+		/// </summary>
+		/// <remarks>
+		/// Emitted when the <see cref="UidNext"/> property changes.
+		/// </remarks>
+		event EventHandler<EventArgs> UidNextChanged;
 
 		/// <summary>
 		/// Occurs when the UID validity changes.
 		/// </summary>
 		/// <remarks>
-		/// Emitted when the UID validity changes.
+		/// Emitted when the <see cref="UidValidity"/> property changes.
 		/// </remarks>
 		event EventHandler<EventArgs> UidValidityChanged;
+
+		/// <summary>
+		/// Occurs when the ID changes.
+		/// </summary>
+		/// <remarks>
+		/// Emitted when the <see cref="Id"/> property changes.
+		/// </remarks>
+		event EventHandler<EventArgs> IdChanged;
+
+		/// <summary>
+		/// Occurs when the size of the folder changes.
+		/// </summary>
+		/// <remarks>
+		/// Emitted when the <see cref="Size"/> property changes.
+		/// </remarks>
+		event EventHandler<EventArgs> SizeChanged;
 
 		/// <summary>
 		/// Occurs when the message count changes.
 		/// </summary>
 		/// <remarks>
-		/// Emitted when the message count changes.
+		/// Emitted when the <see cref="Count"/> property changes.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\ImapIdleExample.cs"/>
+		/// </example>
 		event EventHandler<EventArgs> CountChanged;
 
 		/// <summary>
 		/// Occurs when the recent message count changes.
 		/// </summary>
 		/// <remarks>
-		/// Emitted when the recent message count changes.
+		/// Emitted when the <see cref="Recent"/> property changes.
 		/// </remarks>
 		event EventHandler<EventArgs> RecentChanged;
+
+		/// <summary>
+		/// Occurs when the message unread count changes.
+		/// </summary>
+		/// <remarks>
+		/// Emitted when the <see cref="Unread"/> property changes.
+		/// </remarks>
+		event EventHandler<EventArgs> UnreadChanged;
 	}
 }

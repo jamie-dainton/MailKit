@@ -30,7 +30,7 @@ namespace Examples
 			#region RegisterCustomContext
 			// Note: by registering our custom context it becomes the default OpenPGP context
 			// instantiated by MimeKit when methods such as Encrypt(), Decrypt(), Sign(), and
-			// Verify() are used without an expliit context.
+			// Verify() are used without an explicit context.
 			CryptographyContext.Register (typeof (MyGnuPGContext));
 			#endregion
 		}
@@ -126,9 +126,14 @@ namespace Examples
 		{
 			var text = message.TextBody;
 
-			using (var memory = new MemoryStream (Encoding.ASCII.GetBytes (text), false)) {
+			using (var encrypted = new MemoryStream (Encoding.ASCII.GetBytes (text), false)) {
 				using (var ctx = new MyGnuPGContext ()) {
-					return ctx.GetDecryptedStream (memory);
+					var decrypted = new MemoryStream ();
+
+					ctx.DecryptTo (encrypted, decrypted);
+					decrypted.Position = 0;
+
+					return decrypted;
 				}
 			}
 		}

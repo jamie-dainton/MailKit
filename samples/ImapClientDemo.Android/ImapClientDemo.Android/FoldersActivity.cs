@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -29,9 +29,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 
 using Android.App;
-using Android.Content;
 using Android.OS;
-using Android.Runtime;
 using Android.Views;
 using Android.Widget;
 
@@ -71,8 +69,7 @@ namespace ImapClientDemo
             
         async Task Reload ()
         {
-            var personal = Mail.Client.GetFolder (Mail.Client.PersonalNamespaces[0]); 
-
+            var personal = Mail.Client.GetFolder (Mail.Client.PersonalNamespaces[0]);
             var folders = new List<IMailFolder> ();
 
             // Recursively load all folders and subfolders
@@ -87,6 +84,9 @@ namespace ImapClientDemo
         {
 			if (!folder.IsNamespace)
                 folders.Add (folder);
+
+			if (folder.Attributes.HasFlag (FolderAttributes.HasNoChildren))
+				return;
 
             var subfolders = await folder.GetSubfoldersAsync ();
 

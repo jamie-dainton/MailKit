@@ -1,9 +1,9 @@
 ﻿//
 // SearchResults.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,8 +26,6 @@
 
 using System.Collections.Generic;
 
-using MailKit;
-
 namespace MailKit.Search {
 	/// <summary>
 	/// The results of a search.
@@ -43,9 +41,10 @@ namespace MailKit.Search {
 		/// <remarks>
 		/// Creates a new <see cref="SearchResults"/>.
 		/// </remarks>
-		public SearchResults ()
+		/// <param name="order">The sort-order to use for the unique identifiers.</param>
+		public SearchResults (SortOrder order = SortOrder.None)
 		{
-			UniqueIds = new UniqueId[0];
+			UniqueIds = new UniqueIdSet (order);
 		}
 
 		/// <summary>
@@ -100,6 +99,17 @@ namespace MailKit.Search {
 		/// </remarks>
 		/// <value>The mod-sequence identifier.</value>
 		public ulong? ModSeq {
+			get; set;
+		}
+
+		/// <summary>
+		/// Gets or sets the relevancy scores of the messages that matched the search query.
+		/// </summary>
+		/// <remarks>
+		/// Gets or sets the relevancy scores of the messages that matched the search query.
+		/// </remarks>
+		/// <value>The relevancy scores.</value>
+		public IList<byte> Relevancy {
 			get; set;
 		}
 	}

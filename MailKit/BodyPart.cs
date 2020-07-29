@@ -1,9 +1,9 @@
 ﻿//
 // BodyPart.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -40,6 +40,9 @@ namespace MailKit {
 	/// <see cref="BodyPartText"/>, <see cref="BodyPartMessage"/>, or
 	/// <see cref="BodyPartMultipart"/>.
 	/// </remarks>
+	/// <example>
+	/// <code language="c#" source="Examples\ImapExamples.cs" region="DownloadBodyParts"/>
+	/// </example>
 	public abstract class BodyPart
 	{
 		/// <summary>
@@ -69,10 +72,30 @@ namespace MailKit {
 		/// <remarks>
 		/// Gets the part specifier.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\ImapExamples.cs" region="DownloadBodyParts"/>
+		/// </example>
 		/// <value>The part specifier.</value>
 		public string PartSpecifier {
 			get; set;
 		}
+
+		/// <summary>
+		/// Dispatches to the specific visit method for this MIME body part.
+		/// </summary>
+		/// <remarks>
+		/// This default implementation for <see cref="MailKit.BodyPart"/> nodes
+		/// calls <see cref="MailKit.BodyPartVisitor.VisitBodyPart"/>. Override this
+		/// method to call into a more specific method on a derived visitor class
+		/// of the <see cref="MailKit.BodyPartVisitor"/> class. However, it should still
+		/// support unknown visitors by calling
+		/// <see cref="MailKit.BodyPartVisitor.VisitBodyPart"/>.
+		/// </remarks>
+		/// <param name="visitor">The visitor.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="visitor"/> is <c>null</c>.
+		/// </exception>
+		public abstract void Accept (BodyPartVisitor visitor);
 
 		internal static void Encode (StringBuilder builder, uint value)
 		{
@@ -209,8 +232,8 @@ namespace MailKit {
 		/// </summary>
 		/// <remarks>
 		/// <para>Returns a <see cref="System.String"/> that represents the current <see cref="MailKit.BodyPart"/>.</para>
-		/// <para>Note: The syntax of the string returned, while similar to IMAP's BODYSTRUCTURE syntax,
-		/// is not completely compatible.</para>
+		/// <note type="note">The syntax of the string returned, while similar to IMAP's BODYSTRUCTURE syntax,
+		/// is not completely compatible.</note>
 		/// </remarks>
 		/// <returns>A <see cref="System.String"/> that represents the current <see cref="MailKit.BodyPart"/>.</returns>
 		public override string ToString ()
@@ -327,6 +350,7 @@ namespace MailKit {
 			if (index >= text.Length || text[index] != ')')
 				return false;
 
+			values = list.ToArray ();
 			index++;
 
 			return true;
@@ -470,7 +494,7 @@ namespace MailKit {
 			if (!TryParse (text, ref index, out parameters))
 				return false;
 
-			contentType = new ContentType (type, subtype);
+			contentType = new ContentType (type ?? "application", subtype ?? "octet-stream");
 
 			foreach (var param in parameters)
 				contentType.Parameters.Add (param);
@@ -578,9 +602,9 @@ namespace MailKit {
 				if (!TryParse (text, ref index, false, out contentType))
 					return false;
 
-				if (contentType.Matches ("message", "rfc822"))
+				if (contentType.IsMimeType ("message", "rfc822"))
 					basic = message = new BodyPartMessage ();
-				else if (contentType.Matches ("text", "*"))
+				else if (contentType.IsMimeType ("text", "*"))
 					basic = txt = new BodyPartText ();
 				else
 					basic = new BodyPartBasic ();
@@ -670,7 +694,8 @@ namespace MailKit {
 		/// </summary>
 		/// <remarks>
 		/// <para>Parses a body part from the specified text.</para>
-		/// <para>Note: This syntax, while similar to IMAP's BODYSTRUCTURE syntax, is not completely compatible.</para>
+		/// <note type="note">This syntax, while similar to IMAP's BODYSTRUCTURE syntax, is not completely
+		/// compatible.</note>
 		/// </remarks>
 		/// <returns><c>true</c>, if the body part was successfully parsed, <c>false</c> otherwise.</returns>
 		/// <param name="text">The text to parse.</param>
@@ -681,7 +706,7 @@ namespace MailKit {
 		public static bool TryParse (string text, out BodyPart part)
 		{
 			if (text == null)
-				throw new ArgumentNullException ("text");
+				throw new ArgumentNullException (nameof (text));
 
 			int index = 0;
 

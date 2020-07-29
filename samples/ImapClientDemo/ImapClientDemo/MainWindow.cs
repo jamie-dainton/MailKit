@@ -1,8 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -30,7 +28,7 @@ namespace ImapClientDemo
 
 		void MessageSelected (object sender, MessageSelectedEventArgs e)
 		{
-			Render (e.Folder, e.UniqueId, e.Body);
+			Program.Queue (Render, e);
 		}
 
 		class MultipartRelatedImageContext
@@ -45,7 +43,7 @@ namespace ImapClientDemo
 			string GetDataUri (MimePart attachment)
 			{
 				using (var memory = new MemoryStream ()) {
-					attachment.ContentObject.DecodeTo (memory);
+					attachment.Content.DecodeTo (memory);
 					var buffer = memory.GetBuffer ();
 					var length = (int) memory.Length;
 					var base64 = Convert.ToBase64String (buffer, 0, length);
@@ -116,7 +114,7 @@ namespace ImapClientDemo
 						continue;
 
 					// our preferred mime-type is text/html
-					if (body.ContentType.Matches ("text", "html")) {
+					if (body.ContentType.IsMimeType ("text", "html")) {
 						text = body;
 						break;
 					}
@@ -128,7 +126,7 @@ namespace ImapClientDemo
 
 			// check if we have a text/html document
 			if (text != null) {
-				if (text.ContentType.Matches ("text", "html")) {
+				if (text.ContentType.IsMimeType ("text", "html")) {
 					// replace image src urls that refer to related MIME parts with "data:" urls
 					// Note: we could also save the related MIME part content to disk and use
 					// file:// urls instead.
@@ -146,7 +144,7 @@ namespace ImapClientDemo
 			}
 		}
 
-		async void RenderMultipartRelated (IMailFolder folder, UniqueId uid, BodyPartMultipart bodyPart)
+		async Task RenderMultipartRelatedAsync (IMailFolder folder, UniqueId uid, BodyPartMultipart bodyPart)
 		{
 			// download the entire multipart/related for simplicity since we'll probably end up needing all of the image attachments anyway...
 			var related = await folder.GetBodyPartAsync (uid, bodyPart) as MultipartRelated;
@@ -180,33 +178,33 @@ namespace ImapClientDemo
 			webBrowser.DocumentText = html;
 		}
 
-		async void RenderText (IMailFolder folder, UniqueId uid, BodyPartText bodyPart)
+		async Task RenderTextAsync (IMailFolder folder, UniqueId uid, BodyPartText bodyPart)
 		{
 			var entity = await folder.GetBodyPartAsync (uid, bodyPart);
 
 			RenderText ((TextPart) entity);
 		}
 
-		void Render (IMailFolder folder, UniqueId uid, BodyPart body)
+		async Task RenderAsync (IMailFolder folder, UniqueId uid, BodyPart body)
 		{
 			var multipart = body as BodyPartMultipart;
 
-			if (multipart != null && body.ContentType.Matches ("multipart", "related")) {
-				RenderMultipartRelated (folder, uid, multipart);
+			if (multipart != null && body.ContentType.IsMimeType ("multipart", "related")) {
+				await RenderMultipartRelatedAsync (folder, uid, multipart);
 				return;
 			}
 
 			var text = body as BodyPartText;
 
 			if (multipart != null) {
-				if (multipart.ContentType.Matches ("multipart", "alternative")) {
+				if (multipart.ContentType.IsMimeType ("multipart", "alternative")) {
 					// A multipart/alternative is just a collection of alternate views.
 					// The last part is the format that most closely matches what the
 					// user saw in his or her email client's WYSIWYG editor.
 					for (int i = multipart.BodyParts.Count; i > 0; i--) {
 						var multi = multipart.BodyParts[i - 1] as BodyPartMultipart;
 
-						if (multi != null && multi.ContentType.Matches ("multipart", "related")) {
+						if (multi != null && multi.ContentType.IsMimeType ("multipart", "related")) {
 							if (multi.BodyParts.Count == 0)
 								continue;
 
@@ -219,8 +217,8 @@ namespace ImapClientDemo
 								root = multi.BodyParts.OfType<BodyPartText> ().FirstOrDefault (x => x.ContentId == start);
 							}
 
-							if (root != null && root.ContentType.Matches ("text", "html")) {
-								Render (folder, uid, multi);
+							if (root != null && root.ContentType.IsMimeType ("text", "html")) {
+								await RenderAsync (folder, uid, multi);
 								return;
 							}
 
@@ -230,22 +228,31 @@ namespace ImapClientDemo
 						text = multipart.BodyParts[i - 1] as BodyPartText;
 
 						if (text != null) {
-							RenderText (folder, uid, text);
+							await RenderTextAsync (folder, uid, text);
 							return;
 						}
 					}
 				} else if (multipart.BodyParts.Count > 0) {
 					// The main message body is usually the first part of a multipart/mixed.
-					Render (folder, uid, multipart.BodyParts[0]);
+					await RenderAsync (folder, uid, multipart.BodyParts[0]);
 				}
 			} else if (text != null) {
-				RenderText (folder, uid, text);
+				await RenderTextAsync (folder, uid, text);
 			}
 		}
 
-		public void LoadContent ()
+		async Task Render (Task task, object state)
 		{
-			folderTreeView.LoadFolders ();
+			var e = (MessageSelectedEventArgs) state;
+
+			await task;
+
+			await RenderAsync (e.Folder, e.UniqueId, e.Body);
+		}
+
+		public Task LoadContentAsync ()
+		{
+			return folderTreeView.LoadFoldersAsync ();
 		}
 
 		protected override void OnClosed (EventArgs e)

@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.ComponentModel;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 using MailKit.Net.Imap;
@@ -21,6 +22,7 @@ namespace ImapClientDemo
 			ImageList.Images.Add ("inbox", GetImageResource ("inbox.png"));
 			ImageList.Images.Add ("archive", GetImageResource ("archive.png"));
 			ImageList.Images.Add ("drafts", GetImageResource ("pencil.png"));
+			ImageList.Images.Add ("flagged", GetImageResource ("flag.png"));
 			ImageList.Images.Add ("important", GetImageResource ("important.png"));
 			ImageList.Images.Add ("junk", GetImageResource ("junk.png"));
 			ImageList.Images.Add ("sent", GetImageResource ("paper-plane.png"));
@@ -61,8 +63,6 @@ namespace ImapClientDemo
 				node.SelectedImageKey = node.ImageKey = folder.Count > 0 ? "trash-full" : "trash-empty";
 		}
 
-		delegate void UpdateFolderNodeDelegate (IMailFolder folder);
-
 		TreeNode CreateFolderNode (IMailFolder folder)
 		{
 			var node = new TreeNode (folder.Name) { Tag = folder, ToolTipText = folder.FullName };
@@ -76,6 +76,8 @@ namespace ImapClientDemo
 			else if (folder.Attributes.HasFlag (FolderAttributes.Drafts))
 				node.SelectedImageKey = node.ImageKey = "drafts";
 			else if (folder.Attributes.HasFlag (FolderAttributes.Flagged))
+				node.SelectedImageKey = node.ImageKey = "flagged";
+			else if (folder.FullName == "[Gmail]/Important")
 				node.SelectedImageKey = node.ImageKey = "important";
 			else if (folder.Attributes.HasFlag (FolderAttributes.Junk))
 				node.SelectedImageKey = node.ImageKey = "junk";
@@ -92,73 +94,92 @@ namespace ImapClientDemo
 			return node;
 		}
 
-		void LoadChildFolders (IMailFolder folder, IEnumerable<IMailFolder> children)
+		async Task LoadSubfoldersAsync (IMailFolder folder, IList<IMailFolder> subfolders)
 		{
 			TreeNodeCollection nodes;
 			TreeNode node;
 
 			if (map.TryGetValue (folder, out node)) {
+				// removes the dummy "Loading..." folder
 				nodes = node.Nodes;
 				nodes.Clear ();
 			} else {
 				nodes = Nodes;
 			}
 
-			foreach (var child in children) {
-				node = CreateFolderNode (child);
-				map[child] = node;
+			foreach (var subfolder in subfolders) {
+				node = CreateFolderNode (subfolder);
+				map[subfolder] = node;
 				nodes.Add (node);
 
-				// Note: because we are using the *Async() methods, these events will fire
-				// in another thread so we'll have to proxy them back to the main thread.
-				child.MessageFlagsChanged += UpdateUnreadCount_TaskThread;
-				child.CountChanged += UpdateUnreadCount_TaskThread;
+				subfolder.MessageFlagsChanged += UpdateUnreadCount;
+				subfolder.CountChanged += UpdateUnreadCount;
 
-				if (!child.Attributes.HasFlag (FolderAttributes.NonExistent) && !child.Attributes.HasFlag (FolderAttributes.NoSelect)) {
-					child.StatusAsync (StatusItems.Unread).ContinueWith (task => {
-						Invoke (new UpdateFolderNodeDelegate (UpdateFolderNode), child);
-					});
+				if (!subfolder.Attributes.HasFlag (FolderAttributes.NonExistent) && !subfolder.Attributes.HasFlag (FolderAttributes.NoSelect)) {
+					await subfolder.StatusAsync (StatusItems.Unread);
+					UpdateFolderNode (subfolder);
 				}
 			}
 		}
 
-		async void LoadChildFolders (IMailFolder folder)
+		class FolderComparer : IComparer<IMailFolder>
 		{
-			var children = await folder.GetSubfoldersAsync ();
-
-			LoadChildFolders (folder, children);
+			public int Compare (IMailFolder x, IMailFolder y)
+			{
+				return string.Compare (x.Name, y.Name, StringComparison.CurrentCulture);
+			}
 		}
 
-		public void LoadFolders ()
+		async Task LoadSubfoldersAsync (IMailFolder folder)
+		{
+			var subfolders = await folder.GetSubfoldersAsync ();
+			var sorted = new List<IMailFolder> (subfolders);
+			
+			sorted.Sort (new FolderComparer ());
+
+			await LoadSubfoldersAsync (folder, sorted);
+		}
+
+		public Task LoadFoldersAsync ()
 		{
 			var personal = Program.Client.GetFolder (Program.Client.PersonalNamespaces[0]);
 
 			PathSeparator = personal.DirectorySeparator.ToString ();
 
-			LoadChildFolders (personal);
+			return LoadSubfoldersAsync (personal);
 		}
 
-		async void UpdateUnreadCount (object sender, EventArgs e)
+		async Task UpdateUnreadCountAsync (Task task, object state)
 		{
-			var folder = (IMailFolder) sender;
+			var folder = (IMailFolder) state;
+
+			await task;
 
 			await folder.StatusAsync (StatusItems.Unread);
 			UpdateFolderNode (folder);
 		}
 
-		void UpdateUnreadCount_TaskThread (object sender, EventArgs e)
+		void UpdateUnreadCount (object sender, EventArgs e)
 		{
-			// proxy to the main thread
-			Invoke (new EventHandler<EventArgs> (UpdateUnreadCount), sender, e);
+			Program.Queue (UpdateUnreadCountAsync, sender);
+		}
+
+		async Task ExpandFolderAsync (Task task, object state)
+		{
+			var folder = (IMailFolder) state;
+
+			await task;
+
+			await LoadSubfoldersAsync (folder);
 		}
 
 		protected override void OnBeforeExpand (TreeViewCancelEventArgs e)
 		{
 			if (e.Node.Nodes.Count == 1 && e.Node.Nodes[0].Tag == null) {
 				// this folder has never been expanded before...
-				var folder = (IMailFolder) e.Node.Tag;
+				var folder = e.Node.Tag;
 
-				LoadChildFolders (folder);
+				Program.Queue (ExpandFolderAsync, folder);
 			}
 
 			base.OnBeforeExpand (e);

@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -32,14 +32,14 @@ using UIKit;
 
 namespace ImapClientDemo.iOS
 {
-    public class LoginViewController : DialogViewController
-    {
+	public class LoginViewController : DialogViewController
+	{
 		readonly EntryElement hostEntry, portEntry, userEntry, passwordEntry;
-        readonly FoldersViewController foldersViewController;
+		readonly FoldersViewController foldersViewController;
 		readonly CheckboxElement sslCheckbox;
 
-        public LoginViewController () : base (UITableViewStyle.Grouped, null)
-        {
+		public LoginViewController () : base (UITableViewStyle.Grouped, null)
+		{
 			hostEntry = new EntryElement ("Host", "imap.gmail.com", "imap.gmail.com");
 			portEntry = new EntryElement ("Port", "993", "993") {
 				KeyboardType = UIKeyboardType.NumberPad
@@ -49,59 +49,64 @@ namespace ImapClientDemo.iOS
 			userEntry = new EntryElement ("Username", "Email / Username", "");
 			passwordEntry = new EntryElement ("Password", "password", "", true);
 
-            Root = new RootElement ("IMAP Login") {
-                new Section ("Server") {
+			Root = new RootElement ("IMAP Login") {
+				new Section ("Server") {
 					hostEntry,
-                    portEntry,
-                    sslCheckbox
-                },
-                new Section ("Account") {
-                    userEntry,
-                    passwordEntry
-                },
-                new Section {
-                    new StyledStringElement ("Login", Login)
-                }
-            };
+					portEntry,
+					sslCheckbox
+				},
+				new Section ("Account") {
+					userEntry,
+					passwordEntry
+				},
+				new Section {
+					new StyledStringElement ("Login", Login)
+				}
+			};
 
 			foldersViewController = new FoldersViewController ();
-        }
+		}
 
-        async void Login ()
-        {
-			int port;
+		async void Login ()
+		{
+			hostEntry.FetchValue ();
+			portEntry.FetchValue ();
+			userEntry.FetchValue ();
+			passwordEntry.FetchValue ();
 
-            hostEntry.FetchValue ();
-            portEntry.FetchValue ();
-            userEntry.FetchValue ();
-            passwordEntry.FetchValue ();
+			int.TryParse (portEntry.Value, out var port);
 
-            int.TryParse (portEntry.Value, out port);
-
-            try {
+			try {
 				if (Mail.Client.IsConnected)
 					await Mail.Client.DisconnectAsync (true);
 
-                // Connect to server
-                await Mail.Client.ConnectAsync (hostEntry.Value, port, sslCheckbox.Value);
+				// Note: for demo purposes, we're ignoring SSL validation errors (don't do this in production code)
+				Mail.Client.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
 
-                // Remove this auth mechanism since we don't have an oauth token
-                Mail.Client.AuthenticationMechanisms.Remove ("XOAUTH2");
+				// Connect to server
+				await Mail.Client.ConnectAsync (hostEntry.Value, port, sslCheckbox.Value);
 
-                try {
-                    // Authenticate now that we're connected
-                    await Mail.Client.AuthenticateAsync (userEntry.Value, passwordEntry.Value);
+				try {
+					// Authenticate now that we're connected
+					await Mail.Client.AuthenticateAsync (userEntry.Value, passwordEntry.Value);
 
-                    // Show the folders view controller
-                    NavigationController.PushViewController (foldersViewController, true);
-                } catch (Exception aex) {
-                    Console.WriteLine (aex);
-                    Mail.MessageBox ("Authentication Error", "Failed to Authenticate to server.");
-                }
-            } catch (Exception ex) {
-                Console.WriteLine (ex);
-                Mail.MessageBox ("Connection Error", "Failed to connect to server.");
-            }
-        }
-    }
+					// Show the folders view controller
+					NavigationController.PushViewController (foldersViewController, true);
+				} catch (Exception aex) {
+					Console.WriteLine (aex);
+					Mail.MessageBox ("Authentication Error",
+						"Failed to Authenticate to server. If you are using GMail, then you probably " +
+						"need to go into your GMail settings to enable \"less secure apps\" in order " + 
+						"to get this demo to work.\n\n" +
+						"For a real Mail application, you'll want to add support for obtaining the " +
+						"user's OAuth2 credentials to prevent the need for user's to enable this, but " +
+						"that is beyond the scope of this demo."
+					);
+				}
+			} catch (Exception ex) {
+				Console.WriteLine (ex);
+				Mail.MessageBox ("Connection Error", "Failed to connect to server.");
+			}
+		}
+	}
 }

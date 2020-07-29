@@ -1,9 +1,9 @@
-//
+﻿//
 // Pop3Stream.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,18 +27,14 @@
 using System;
 using System.IO;
 using System.Threading;
-using Buffer = System.Buffer;
-
-#if NETFX_CORE
-using Windows.Storage.Streams;
-using Windows.Networking.Sockets;
-using Socket = Windows.Networking.Sockets.StreamSocket;
-#else
-using System.Net.Security;
 using System.Net.Sockets;
-#endif
+using System.Threading.Tasks;
 
 using MimeKit.IO;
+
+using Buffer = System.Buffer;
+using SslStream = MailKit.Net.SslStream;
+using NetworkStream = MailKit.Net.NetworkStream;
 
 namespace MailKit.Net.Pop3 {
 	/// <summary>
@@ -95,14 +91,12 @@ namespace MailKit.Net.Pop3 {
 		/// Creates a new <see cref="Pop3Stream"/>.
 		/// </remarks>
 		/// <param name="source">The underlying network stream.</param>
-		/// <param name="socket">The underlying network socket.</param>
 		/// <param name="protocolLogger">The protocol logger.</param>
-		public Pop3Stream (Stream source, Socket socket, IProtocolLogger protocolLogger)
+		public Pop3Stream (Stream source, IProtocolLogger protocolLogger)
 		{
 			logger = protocolLogger;
 			IsConnected = true;
 			Stream = source;
-			Socket = socket;
 		}
 
 		/// <summary>
@@ -114,17 +108,6 @@ namespace MailKit.Net.Pop3 {
 		/// <value>The underlying network stream.</value>
 		public Stream Stream {
 			get; internal set;
-		}
-
-		/// <summary>
-		/// Get the underlying network socket.
-		/// </summary>
-		/// <remarks>
-		/// Gets the underlying network socket.
-		/// </remarks>
-		/// <value>The underlying network socket.</value>
-		public Socket Socket {
-			get; private set;
 		}
 
 		/// <summary>
@@ -250,7 +233,7 @@ namespace MailKit.Net.Pop3 {
 		/// </exception>
 		public override long Position {
 			get { return Stream.Position; }
-			set { Stream.Position = value; }
+			set { throw new NotSupportedException (); }
 		}
 
 		/// <summary>
@@ -271,26 +254,7 @@ namespace MailKit.Net.Pop3 {
 			get { return Stream.Length; }
 		}
 
-		void Poll (SelectMode mode, CancellationToken cancellationToken)
-		{
-#if NETFX_CORE
-			cancellationToken.ThrowIfCancellationRequested ();
-#else
-			if (!cancellationToken.CanBeCanceled)
-				return;
-
-			if (Socket != null) {
-				do {
-					cancellationToken.ThrowIfCancellationRequested ();
-					// wait 1/4 second and then re-check for cancellation
-				} while (!Socket.Poll (250000, mode));
-			} else {
-				cancellationToken.ThrowIfCancellationRequested ();
-			}
-#endif
-		}
-
-		unsafe int ReadAhead (CancellationToken cancellationToken)
+		async Task<int> ReadAheadAsync (bool doAsync, CancellationToken cancellationToken)
 		{
 			int left = inputEnd - inputIndex;
 			int start = inputStart;
@@ -326,19 +290,14 @@ namespace MailKit.Net.Pop3 {
 			end = input.Length - PadSize;
 
 			try {
-#if !NETFX_CORE
-				bool buffered = Stream is SslStream;
-#else
-				bool buffered = true;
-#endif
+				var network = Stream as NetworkStream;
 
-				if (buffered) {
-					cancellationToken.ThrowIfCancellationRequested ();
+				cancellationToken.ThrowIfCancellationRequested ();
 
-					nread = Stream.Read (input, start, end - start);
+				if (doAsync) {
+					nread = await Stream.ReadAsync (input, start, end - start, cancellationToken).ConfigureAwait (false);
 				} else {
-					Poll (SelectMode.SelectRead, cancellationToken);
-
+					network?.Poll (SelectMode.SelectRead, cancellationToken);
 					nread = Stream.Read (input, start, end - start);
 				}
 
@@ -359,27 +318,111 @@ namespace MailKit.Net.Pop3 {
 		static void ValidateArguments (byte[] buffer, int offset, int count)
 		{
 			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
+				throw new ArgumentNullException (nameof (buffer));
 
 			if (offset < 0 || offset > buffer.Length)
-				throw new ArgumentOutOfRangeException ("offset");
+				throw new ArgumentOutOfRangeException (nameof (offset));
 
 			if (count < 0 || count > (buffer.Length - offset))
-				throw new ArgumentOutOfRangeException ("count");
+				throw new ArgumentOutOfRangeException (nameof (count));
 		}
 
 		void CheckDisposed ()
 		{
 			if (disposed)
-				throw new ObjectDisposedException ("Pop3Stream");
+				throw new ObjectDisposedException (nameof (Pop3Stream));
 		}
 
-		unsafe bool NeedInput (byte* inptr, int inputLeft)
+		bool NeedInput (int index, int inputLeft)
 		{
-			if (inputLeft == 2 && *inptr == (byte) '.' && *(inptr + 1) == '\n')
+			if (inputLeft == 2 && input[index] == (byte) '.' && input[index + 1] == '\n')
 				return false;
 
 			return true;
+		}
+
+		async Task<int> ReadAsync (byte[] buffer, int offset, int count, bool doAsync, CancellationToken cancellationToken)
+		{
+			CheckDisposed ();
+
+			ValidateArguments (buffer, offset, count);
+
+			if (Mode != Pop3StreamMode.Data)
+				throw new InvalidOperationException ();
+
+			if (IsEndOfData || count == 0)
+				return 0;
+
+			int end = offset + count;
+			int index = offset;
+			int inputLeft;
+
+			do {
+				inputLeft = inputEnd - inputIndex;
+
+				// we need at least 3 bytes: ".\r\n"
+				if (inputLeft < 3 && (midline || NeedInput (inputIndex, inputLeft))) {
+					if (index > offset)
+						break;
+
+					await ReadAheadAsync (doAsync, cancellationToken).ConfigureAwait (false);
+				}
+
+				// terminate the input buffer with a '\n' to remove bounds checking in our inner loop
+				input[inputEnd] = (byte) '\n';
+
+				while (inputIndex < inputEnd) {
+					if (midline) {
+						// read until end-of-line
+						while (index < end && input[inputIndex] != (byte) '\n')
+							buffer[index++] = input[inputIndex++];
+
+						if (inputIndex == inputEnd || index == end)
+							break;
+
+						// consume the '\n' character
+						buffer[index++] = input[inputIndex++];
+						midline = false;
+					}
+
+					if (inputIndex == inputEnd)
+						break;
+
+					if (input[inputIndex] == (byte) '.') {
+						inputLeft = inputEnd - inputIndex;
+
+						// check for ".\r\n" which signifies the end of the data stream
+						if (inputLeft >= 3 && input[inputIndex + 1] == (byte) '\r' && input[inputIndex + 2] == (byte) '\n') {
+							IsEndOfData = true;
+							midline = false;
+							inputIndex += 3;
+							break;
+						}
+
+						// check for ".\n" which is used by some broken UNIX servers in place of ".\r\n"
+						if (inputLeft >= 2 && input[inputIndex + 1] == (byte) '\n') {
+							IsEndOfData = true;
+							midline = false;
+							inputIndex += 2;
+							break;
+						}
+
+						// check for "." or ".\r" which might be an incomplete termination sequence
+						if (inputLeft == 1 || (inputLeft == 2 && input[inputIndex + 1] == (byte) '\r')) {
+							// not enough data...
+							break;
+						}
+
+						// check for lines beginning with ".." which should be transformed into "."
+						if (input[inputIndex + 1] == (byte) '.')
+							inputIndex++;
+					}
+
+					midline = true;
+				}
+			} while (index < end && !IsEndOfData);
+
+			return index - offset;
 		}
 
 		/// <summary>
@@ -419,91 +462,7 @@ namespace MailKit.Net.Pop3 {
 		/// </exception>
 		public int Read (byte[] buffer, int offset, int count, CancellationToken cancellationToken)
 		{
-			CheckDisposed ();
-
-			ValidateArguments (buffer, offset, count);
-
-			if (Mode != Pop3StreamMode.Data)
-				throw new InvalidOperationException ();
-
-			if (IsEndOfData || count == 0)
-				return 0;
-
-			unsafe {
-				fixed (byte* inbuf = input, bufptr = buffer) {
-					byte* outbuf = bufptr + offset;
-					byte* outend = outbuf + count;
-					byte* outptr = outbuf;
-					byte* inptr, inend;
-					int inputLeft;
-
-					do {
-						inputLeft = inputEnd - inputIndex;
-						inptr = inbuf + inputIndex;
-
-						// we need at least 3 bytes: ".\r\n"
-						if (inputLeft < 3 && (midline || NeedInput (inptr, inputLeft))) {
-							if (outptr > outbuf)
-								break;
-
-							ReadAhead (cancellationToken);
-							inptr = inbuf + inputIndex;
-						}
-
-						inend = inbuf + inputEnd;
-						*inend = (byte) '\n';
-
-						while (inptr < inend) {
-							if (midline) {
-								// read until end-of-line
-								while (outptr < outend && *inptr != (byte) '\n')
-									*outptr++ = *inptr++;
-
-								if (inptr == inend || outptr == outend)
-									break;
-
-								*outptr++ = *inptr++;
-								midline = false;
-							}
-
-							if (inptr == inend)
-								break;
-
-							if (*inptr == (byte) '.') {
-								inputLeft = (int) (inend - inptr);
-
-								if (inputLeft >= 3 && *(inptr + 1) == (byte) '\r' && *(inptr + 2) == (byte) '\n') {
-									IsEndOfData = true;
-									midline = false;
-									inptr += 3;
-									break;
-								}
-
-								if (inputLeft >= 2 && *(inptr + 1) == (byte) '\n') {
-									IsEndOfData = true;
-									midline = false;
-									inptr += 2;
-									break;
-								}
-
-								if (inputLeft == 1 || (inputLeft == 2 && *(inptr + 1) == (byte) '\r')) {
-									// not enough data...
-									break;
-								}
-
-								if (*(inptr + 1) == (byte) '.')
-									inptr++;
-							}
-
-							midline = true;
-						}
-
-						inputIndex = (int) (inptr - inbuf);
-					} while (outptr < outend && !IsEndOfData);
-
-					return (int) (outptr - outbuf);
-				}
-			}
+			return ReadAsync (buffer, offset, count, false, cancellationToken).GetAwaiter ().GetResult ();
 		}
 
 		/// <summary>
@@ -543,18 +502,33 @@ namespace MailKit.Net.Pop3 {
 		}
 
 		/// <summary>
-		/// Reads a single line of input from the stream.
+		/// Reads a sequence of bytes from the stream and advances the position
+		/// within the stream by the number of bytes read.
 		/// </summary>
 		/// <remarks>
-		/// This method should be called in a loop until it returns <c>true</c>.
+		/// Reads a sequence of bytes from the stream and advances the position
+		/// within the stream by the number of bytes read.
 		/// </remarks>
-		/// <returns><c>true</c>, if reading the line is complete, <c>false</c> otherwise.</returns>
-		/// <param name="buffer">The buffer containing the line data.</param>
-		/// <param name="offset">The offset into the buffer containing bytes read.</param>
-		/// <param name="count">The number of bytes read.</param>
+		/// <returns>The total number of bytes read into the buffer. This can be less than the number of bytes requested if that many
+		/// bytes are not currently available, or zero (0) if the end of the stream has been reached.</returns>
+		/// <param name="buffer">The buffer.</param>
+		/// <param name="offset">The buffer offset.</param>
+		/// <param name="count">The number of bytes to read.</param>
 		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="buffer"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <para><paramref name="offset"/> is less than zero or greater than the length of <paramref name="buffer"/>.</para>
+		/// <para>-or-</para>
+		/// <para>The <paramref name="buffer"/> is not large enough to contain <paramref name="count"/> bytes strting
+		/// at the specified <paramref name="offset"/>.</para>
+		/// </exception>
 		/// <exception cref="System.ObjectDisposedException">
 		/// The stream has been disposed.
+		/// </exception>
+		/// <exception cref="System.InvalidOperationException">
+		/// The stream is in line mode (see <see cref="Pop3StreamMode.Line"/>).
 		/// </exception>
 		/// <exception cref="System.OperationCanceledException">
 		/// The operation was canceled via the cancellation token.
@@ -562,19 +536,23 @@ namespace MailKit.Net.Pop3 {
 		/// <exception cref="System.IO.IOException">
 		/// An I/O error occurred.
 		/// </exception>
-		internal bool ReadLine (out byte[] buffer, out int offset, out int count, CancellationToken cancellationToken)
+		public override Task<int> ReadAsync (byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+		{
+			return ReadAsync (buffer, offset, count, true, cancellationToken);
+		}
+
+		async Task<bool> ReadLineAsync (Stream ostream, bool doAsync, CancellationToken cancellationToken)
 		{
 			CheckDisposed ();
+
+			if (inputIndex == inputEnd)
+				await ReadAheadAsync (doAsync, cancellationToken).ConfigureAwait (false);
 
 			unsafe {
 				fixed (byte* inbuf = input) {
 					byte* start, inptr, inend;
-
-					if (inputIndex == inputEnd)
-						ReadAhead (cancellationToken);
-
-					offset = inputIndex;
-					buffer = input;
+					int offset = inputIndex;
+					int count;
 
 					start = inbuf + inputIndex;
 					inend = inbuf + inputEnd;
@@ -589,6 +567,7 @@ namespace MailKit.Net.Pop3 {
 					count = (int) (inptr - start);
 
 					if (inptr == inend) {
+						ostream.Write (input, offset, count);
 						midline = true;
 						return false;
 					}
@@ -598,9 +577,116 @@ namespace MailKit.Net.Pop3 {
 					inputIndex++;
 					count++;
 
+					ostream.Write (input, offset, count);
+
 					return true;
 				}
 			}
+		}
+
+		/// <summary>
+		/// Reads a single line of input from the stream.
+		/// </summary>
+		/// <remarks>
+		/// This method should be called in a loop until it returns <c>true</c>.
+		/// </remarks>
+		/// <returns><c>true</c>, if reading the line is complete, <c>false</c> otherwise.</returns>
+		/// <param name="ostream">The output stream to write the line data into.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <exception cref="System.ObjectDisposedException">
+		/// The stream has been disposed.
+		/// </exception>
+		/// <exception cref="System.OperationCanceledException">
+		/// The operation was canceled via the cancellation token.
+		/// </exception>
+		/// <exception cref="System.IO.IOException">
+		/// An I/O error occurred.
+		/// </exception>
+		internal bool ReadLine (Stream ostream, CancellationToken cancellationToken)
+		{
+			return ReadLineAsync (ostream, false, cancellationToken).GetAwaiter ().GetResult ();
+		}
+
+		/// <summary>
+		/// Asynchronously reads a single line of input from the stream.
+		/// </summary>
+		/// <remarks>
+		/// This method should be called in a loop until it returns <c>true</c>.
+		/// </remarks>
+		/// <returns><c>true</c>, if reading the line is complete, <c>false</c> otherwise.</returns>
+		/// <param name="ostream">The output stream to write the line data into.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <exception cref="System.ObjectDisposedException">
+		/// The stream has been disposed.
+		/// </exception>
+		/// <exception cref="System.OperationCanceledException">
+		/// The operation was canceled via the cancellation token.
+		/// </exception>
+		/// <exception cref="System.IO.IOException">
+		/// An I/O error occurred.
+		/// </exception>
+		internal Task<bool> ReadLineAsync (Stream ostream, CancellationToken cancellationToken)
+		{
+			return ReadLineAsync (ostream, true, cancellationToken);
+		}
+
+		async Task WriteAsync (byte[] buffer, int offset, int count, bool doAsync, CancellationToken cancellationToken)
+		{
+			CheckDisposed ();
+
+			ValidateArguments (buffer, offset, count);
+
+			try {
+				var network = NetworkStream.Get (Stream);
+				int index = offset;
+				int left = count;
+
+				while (left > 0) {
+					int n = Math.Min (BlockSize - outputIndex, left);
+
+					if (outputIndex > 0 || n < BlockSize) {
+						// append the data to the output buffer
+						Buffer.BlockCopy (buffer, index, output, outputIndex, n);
+						outputIndex += n;
+						index += n;
+						left -= n;
+					}
+
+					if (outputIndex == BlockSize) {
+						// flush the output buffer
+						if (doAsync) {
+							await Stream.WriteAsync (output, 0, BlockSize, cancellationToken).ConfigureAwait (false);
+						} else {
+							network?.Poll (SelectMode.SelectWrite, cancellationToken);
+							Stream.Write (output, 0, BlockSize);
+						}
+						logger.LogClient (output, 0, BlockSize);
+						outputIndex = 0;
+					}
+
+					if (outputIndex == 0) {
+						// write blocks of data to the stream without buffering
+						while (left >= BlockSize) {
+							if (doAsync) {
+								await Stream.WriteAsync (buffer, index, BlockSize, cancellationToken).ConfigureAwait (false);
+							} else {
+								network?.Poll (SelectMode.SelectWrite, cancellationToken);
+								Stream.Write (buffer, index, BlockSize);
+							}
+							logger.LogClient (buffer, index, BlockSize);
+							index += BlockSize;
+							left -= BlockSize;
+						}
+					}
+				}
+			} catch (Exception ex) {
+				IsConnected = false;
+				if (!(ex is OperationCanceledException))
+					cancellationToken.ThrowIfCancellationRequested ();
+				throw;
+			}
+
+			IsEndOfData = false;
 		}
 
 		/// <summary>
@@ -638,50 +724,7 @@ namespace MailKit.Net.Pop3 {
 		/// </exception>
 		public void Write (byte[] buffer, int offset, int count, CancellationToken cancellationToken)
 		{
-			CheckDisposed ();
-
-			ValidateArguments (buffer, offset, count);
-
-			try {
-				int index = offset;
-				int left = count;
-
-				while (left > 0) {
-					int n = Math.Min (BlockSize - outputIndex, left);
-
-					if (outputIndex > 0 || n < BlockSize) {
-						// append the data to the output buffer
-						Buffer.BlockCopy (buffer, index, output, outputIndex, n);
-						outputIndex += n;
-						index += n;
-						left -= n;
-					}
-
-					if (outputIndex == BlockSize) {
-						// flush the output buffer
-						Poll (SelectMode.SelectWrite, cancellationToken);
-						Stream.Write (output, 0, BlockSize);
-						logger.LogClient (output, 0, BlockSize);
-						outputIndex = 0;
-					}
-
-					if (outputIndex == 0) {
-						// write blocks of data to the stream without buffering
-						while (left >= BlockSize) {
-							Poll (SelectMode.SelectWrite, cancellationToken);
-							Stream.Write (buffer, index, BlockSize);
-							logger.LogClient (buffer, index, BlockSize);
-							index += BlockSize;
-							left -= BlockSize;
-						}
-					}
-				}
-			} catch {
-				IsConnected = false;
-				throw;
-			}
-
-			IsEndOfData = false;
+			WriteAsync (buffer, offset, count, false, cancellationToken).GetAwaiter ().GetResult ();
 		}
 
 		/// <summary>
@@ -719,6 +762,73 @@ namespace MailKit.Net.Pop3 {
 		}
 
 		/// <summary>
+		/// Writes a sequence of bytes to the stream and advances the current
+		/// position within this stream by the number of bytes written.
+		/// </summary>
+		/// <remarks>
+		/// Writes a sequence of bytes to the stream and advances the current
+		/// position within this stream by the number of bytes written.
+		/// </remarks>
+		/// <returns>A task that represents the asynchronous write operation.</returns>
+		/// <param name='buffer'>The buffer to write.</param>
+		/// <param name='offset'>The offset of the first byte to write.</param>
+		/// <param name='count'>The number of bytes to write.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="buffer"/> is <c>null</c>.
+		/// </exception>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <para><paramref name="offset"/> is less than zero or greater than the length of <paramref name="buffer"/>.</para>
+		/// <para>-or-</para>
+		/// <para>The <paramref name="buffer"/> is not large enough to contain <paramref name="count"/> bytes strting
+		/// at the specified <paramref name="offset"/>.</para>
+		/// </exception>
+		/// <exception cref="System.ObjectDisposedException">
+		/// The stream has been disposed.
+		/// </exception>
+		/// <exception cref="System.NotSupportedException">
+		/// The stream does not support writing.
+		/// </exception>
+		/// <exception cref="System.OperationCanceledException">
+		/// The operation was canceled via the cancellation token.
+		/// </exception>
+		/// <exception cref="System.IO.IOException">
+		/// An I/O error occurred.
+		/// </exception>
+		public override Task WriteAsync (byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+		{
+			return WriteAsync (buffer, offset, count, true, cancellationToken);
+		}
+
+		async Task FlushAsync (bool doAsync, CancellationToken cancellationToken)
+		{
+			CheckDisposed ();
+
+			if (outputIndex == 0)
+				return;
+
+			try {
+				if (doAsync) {
+					await Stream.WriteAsync (output, 0, outputIndex, cancellationToken).ConfigureAwait (false);
+					await Stream.FlushAsync (cancellationToken).ConfigureAwait (false);
+				} else {
+					var network = NetworkStream.Get (Stream);
+
+					network?.Poll (SelectMode.SelectWrite, cancellationToken);
+					Stream.Write (output, 0, outputIndex);
+					Stream.Flush ();
+				}
+				logger.LogClient (output, 0, outputIndex);
+				outputIndex = 0;
+			} catch (Exception ex) {
+				IsConnected = false;
+				if (!(ex is OperationCanceledException))
+					cancellationToken.ThrowIfCancellationRequested ();
+				throw;
+			}
+		}
+
+		/// <summary>
 		/// Clears all buffers for this stream and causes any buffered data to be written
 		/// to the underlying device.
 		/// </summary>
@@ -741,21 +851,7 @@ namespace MailKit.Net.Pop3 {
 		/// </exception>
 		public void Flush (CancellationToken cancellationToken)
 		{
-			CheckDisposed ();
-
-			if (outputIndex == 0)
-				return;
-
-			try {
-				Poll (SelectMode.SelectWrite, cancellationToken);
-				Stream.Write (output, 0, outputIndex);
-				Stream.Flush ();
-				logger.LogClient (output, 0, outputIndex);
-				outputIndex = 0;
-			} catch {
-				IsConnected = false;
-				throw;
-			}
+			FlushAsync (false, cancellationToken).GetAwaiter ().GetResult ();
 		}
 
 		/// <summary>
@@ -778,6 +874,33 @@ namespace MailKit.Net.Pop3 {
 		public override void Flush ()
 		{
 			Flush (CancellationToken.None);
+		}
+
+		/// <summary>
+		/// Clears all buffers for this stream and causes any buffered data to be written
+		/// to the underlying device.
+		/// </summary>
+		/// <remarks>
+		/// Clears all buffers for this stream and causes any buffered data to be written
+		/// to the underlying device.
+		/// </remarks>
+		/// <returns>A task that represents the asynchronous flush operation.</returns>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <exception cref="System.ObjectDisposedException">
+		/// The stream has been disposed.
+		/// </exception>
+		/// <exception cref="System.NotSupportedException">
+		/// The stream does not support writing.
+		/// </exception>
+		/// <exception cref="System.OperationCanceledException">
+		/// The operation was canceled via the cancellation token.
+		/// </exception>
+		/// <exception cref="System.IO.IOException">
+		/// An I/O error occurred.
+		/// </exception>
+		public override Task FlushAsync (CancellationToken cancellationToken)
+		{
+			return FlushAsync (true, cancellationToken);
 		}
 
 		/// <summary>
@@ -817,8 +940,9 @@ namespace MailKit.Net.Pop3 {
 			if (disposing && !disposed) {
 				IsConnected = false;
 				Stream.Dispose ();
-				disposed = true;
 			}
+
+			disposed = true;
 
 			base.Dispose (disposing);
 		}

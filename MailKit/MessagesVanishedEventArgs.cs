@@ -1,9 +1,9 @@
-﻿//
+//
 // MessagesVanishedEventArgs.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2014 Jeffrey Stedfast
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -45,6 +45,9 @@ namespace MailKit {
 		/// </remarks>
 		/// <param name="uids">The list of unique identifiers.</param>
 		/// <param name="earlier">If set to <c>true</c>, the messages vanished in the past as opposed to just now.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="uids"/> is <c>null</c>.
+		/// </exception>
 		public MessagesVanishedEventArgs (IList<UniqueId> uids, bool earlier)
 		{
 			UniqueIds = new ReadOnlyCollection<UniqueId> (uids);
@@ -63,10 +66,10 @@ namespace MailKit {
 		}
 
 		/// <summary>
-		/// Gets whether the messages vanished inthe past as opposed to just now.
+		/// Gets whether the messages vanished in the past as opposed to just now.
 		/// </summary>
 		/// <remarks>
-		/// Gets whether the messages vanished inthe past as opposed to just now.
+		/// Gets whether the messages vanished in the past as opposed to just now.
 		/// </remarks>
 		/// <value><c>true</c> if the messages vanished earlier; otherwise, <c>false</c>.</value>
 		public bool Earlier {

@@ -1,63 +1,133 @@
 <?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
-    <metadata>
-        <id>MailKit</id>
-        <version>1.2.10.0</version>
-        <title>MailKit</title>
-        <authors>Jeffrey Stedfast</authors>
-        <owners>Jeffrey Stedfast</owners>
-        <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
-        <projectUrl>http://github.com/jstedfast/MailKit</projectUrl>
-        <iconUrl>https://raw.github.com/jstedfast/MailKit/master/nuget/mailkit-50.png</iconUrl>
-        <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>MailKit is an Open Source cross-platform .NET mail-client library that is based on MimeKit and optimized for mobile devices.
+  <metadata minClientVersion="2.12">
+    <id>MailKit</id>
+    <version>2.8.0</version>
+    <title>MailKit</title>
+    <authors>Jeffrey Stedfast</authors>
+    <owners>Jeffrey Stedfast</owners>
+    <license type="expression">MIT</license>
+    <projectUrl>http://www.mimekit.net</projectUrl>
+    <repository type="git" url="https://github.com/jstedfast/MailKit" />
+    <icon>icons\mailkit-50.png</icon>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>MailKit is an Open Source cross-platform .NET mail-client library that is based on MimeKit and optimized for mobile devices.
 
 Features include:
-* SASL Authentication via SCRAM-SHA-1, NTLM, DIGEST-MD5, CRAM-MD5, LOGIN, PLAIN, and XOAUTH2.
+* HTTP, Socks4, Socks4a and Socks5 proxy support.
+* SASL Authentication via SCRAM-SHA-256, SCRAM-SHA-1, NTLM, DIGEST-MD5, CRAM-MD5, LOGIN, PLAIN, and XOAUTH2.
 * A fully-cancellable SmtpClient with support for STARTTLS, 8BITMIME, BINARYMIME, ENHANCEDSTATUSCODES, SIZE, DSN, PIPELINING and SMTPUTF8.
 * A fully-cancellable Pop3Client with support for STLS, UIDL, APOP, PIPELINING, UTF8, and LANG.
-* A fully-cancellable ImapClient with support for ACL, QUOTA, LITERAL+, IDLE, NAMESPACE, ID, CHILDREN, LOGINDISABLED, STARTTLS, MULTIAPPEND, UNSELECT, UIDPLUS, CONDSTORE, ESEARCH, SASL-IR, COMPRESS, WITHIN, ENABLE, QRESYNC, SORT, THREAD, ESORT, SPECIAL-USE, MOVE, SORT=DISPLAY, SEARCH=FUZZY, UTF8=ACCEPT, UTF8=ONLY, XLIST, and X-GM-EXT1.
+* A fully-cancellable ImapClient with support for ACL, QUOTA, LITERAL+, IDLE, NAMESPACE, ID, CHILDREN, LOGINDISABLED, STARTTLS, MULTIAPPEND, UNSELECT, UIDPLUS, CONDSTORE, ESEARCH, SASL-IR, COMPRESS, WITHIN, ENABLE, QRESYNC, SORT, THREAD, ANNOTATE, LIST-EXTENDED, ESORT, METADATA / METADATA-SERVER, NOTIFY, FILTERS, LIST-STATUS, SORT=DISPLAY, SPECIAL-USE / CREATE-SPECIAL-USE, SEARCH=FUZZY, MOVE, UTF8=ACCEPT / UTF8=ONLY, LITERAL-, APPENDLIMIT, STATUS=SIZE, OBJECTID, REPLACE, SAVEDATE, XLIST, and X-GM-EXT1.
 * Client-side sorting and threading of messages (the Ordinal Subject and the Jamie Zawinski threading algorithms are supported).
 * Asynchronous versions of all methods that hit the network.
-* S/MIME and PGP support via MimeKit.
-* Microsoft TNEF support via MimeKit.</description>
-        <summary>An Open Source .NET mail-client library for Windows, Mac, Linux, and mobile platforms such as iOS and Android.</summary>
-        <releaseNotes>* Added an SslProtocols property to ImapClient, Pop3Client, and SmtpClient to allow developers to override which SSL protocols are to be allowed for SSL connections. (issue #229)
-* Added a work-around for GMail IMAP (and other IMAP servers) that sometimes send an illegal MODSEQ value of 0. (issue #228)
-</releaseNotes>
-        <copyright>Xamarin Inc.</copyright>
-        <language>en-US</language>
-        <tags>smtp pop3 imap mime security smime s/mime openpgp pgp mbox email parser tnef xamarin android ios monodroid monotouch net40 net45 wpa81</tags>
-        <dependencies>
-            <dependency id="MimeKit" version="1.2.10.0" />
-        </dependencies>
-        <frameworkAssemblies>
-            <frameworkAssembly assemblyName="System" targetFramework=".NETFramework4.0" />
-            <frameworkAssembly assemblyName="System.Core" targetFramework=".NETFramework4.0" />
-            <frameworkAssembly assemblyName="System.Data" targetFramework=".NETFramework4.0" />
-            <frameworkAssembly assemblyName="System" targetFramework=".NETFramework4.5" />
-            <frameworkAssembly assemblyName="System.Core" targetFramework=".NETFramework4.5" />
-            <frameworkAssembly assemblyName="System.Data" targetFramework=".NETFramework4.5" />
-            <frameworkAssembly assemblyName="System" targetFramework="MonoAndroid0.0" />
-            <frameworkAssembly assemblyName="System.Core" targetFramework="MonoAndroid0.0" />
-            <frameworkAssembly assemblyName="System.Data" targetFramework="MonoAndroid0.0" />
-            <frameworkAssembly assemblyName="System" targetFramework="Xamarin.iOS10" />
-            <frameworkAssembly assemblyName="System.Core" targetFramework="Xamarin.iOS10" />
-            <frameworkAssembly assemblyName="System.Data" targetFramework="Xamarin.iOS10" />
-        </frameworkAssemblies>
-    </metadata>
-    <files>
-        <file src="..\MailKit\bin\Release\lib\MonoAndroid\MailKit.dll" target="lib\MonoAndroid\MailKit.dll" />
-        <file src="..\MailKit\bin\Release\lib\MonoAndroid\MailKit.xml" target="lib\MonoAndroid\MailKit.xml" />
-        <file src="..\MailKit\bin\Release\lib\Xamarin.iOS\MailKit.dll" target="lib\xamarinios10\MailKit.dll" />
-        <file src="..\MailKit\bin\Release\lib\Xamarin.iOS\MailKit.xml" target="lib\xamarinios10\MailKit.xml" />
-        <file src="..\MailKit\bin\Release\lib\net40\MailKit.dll" target="lib\net40\MailKit.dll" />
-        <file src="..\MailKit\bin\Release\lib\net40\MailKit.xml" target="lib\net40\MailKit.xml" />
-        <file src="..\MailKit\bin\Release\lib\net45\MailKit.dll" target="lib\net45\MailKit.dll" />
-        <file src="..\MailKit\bin\Release\lib\net45\MailKit.xml" target="lib\net45\MailKit.xml" />
-        <file src="..\MailKit\bin\Release\lib\wpa81\MailKit.dll" target="lib\win81\MailKit.dll" />
-        <file src="..\MailKit\bin\Release\lib\wpa81\MailKit.xml" target="lib\win81\MailKit.xml" />
-        <file src="..\MailKit\bin\Release\lib\wpa81\MailKit.dll" target="lib\wpa81\MailKit.dll" />
-        <file src="..\MailKit\bin\Release\lib\wpa81\MailKit.xml" target="lib\wpa81\MailKit.xml" />
-    </files>
+* S/MIME, OpenPGP, DKIM and ARC support via MimeKit.
+* Microsoft TNEF support via MimeKit.
+    </description>
+    <summary>An Open Source .NET mail-client library for Windows, Mac, Linux, and mobile platforms such as iOS and Android.</summary>
+    <releaseNotes>
+* Make sure to use the InvariantCulture when converting port values to a string. (issue #1040)
+* Fixed other instances of string formatting for integer values to always use CultureInfo.InvariantCulture.
+* Added a work-around for broken IMAP servers that allow NIL message flags. (issue #1042)
+
+API Changes Since 2.0.x:
+
+* Obsoleted SearchQuery.HasCustomFlags() and SearchQuery.DoesNotHaveCustomFlags(). These are now SearchQuery.HasKeywords() and SearchQuery.NotKeywords(), respectively.
+* Obsoleted SearchQuery.DoesNotHaveFlags() in favor of SearchQuery.NotFlags().
+* Obsoleted the IMessageSummary.UserFlags property in favor of IMessageSummary.Keywords.
+* Obsoleted the MessageFlagsChangedEventArgs.UserFlags property in favor of MessageFlagsChangedEventArgs.Keywords.
+* All IMailFolder.Fetch and IMailFolder.FetchAsync methods that took a HashSet&lt;string&gt; userFlags argument now take an IEnumerable&lt;string&gt; keywords argument. Note: this only affects you if your code used named method parameters (e.g. userFlags: myUserFlags).
+
+Note to users upgrading from MailKit 1.x:
+
+In order to authenticate using the XOAUTH2 SASL mechanism, you must now use the following approach:
+
+client.Authenticate (new SaslMechanismOAuth2 (username, auth_token));
+    </releaseNotes>
+    <copyright>.NET Foundation and Contributors</copyright>
+    <language>en-US</language>
+    <tags>smtp pop3 imap mime security arc dkim smime s/mime openpgp pgp mbox mail email parser tnef net45 net46 net47 net58 netstandard netstandard1.3 netstandard1.6 netstandard2.0</tags>
+    <frameworkAssemblies>
+      <frameworkAssembly assemblyName="System" targetFramework=".NETFramework4.5" />
+      <frameworkAssembly assemblyName="System.Core" targetFramework=".NETFramework4.5" />
+      <frameworkAssembly assemblyName="System.Data" targetFramework=".NETFramework4.5" />
+      <frameworkAssembly assemblyName="System.Net.Http" targetFramework=".NETFramework4.5" />
+      <frameworkAssembly assemblyName="System" targetFramework=".NETFramework4.6" />
+      <frameworkAssembly assemblyName="System.Core" targetFramework=".NETFramework4.6" />
+      <frameworkAssembly assemblyName="System.Data" targetFramework=".NETFramework4.6" />
+      <frameworkAssembly assemblyName="System.Net.Http" targetFramework=".NETFramework4.6" />
+      <frameworkAssembly assemblyName="System" targetFramework=".NETFramework4.7" />
+      <frameworkAssembly assemblyName="System.Core" targetFramework=".NETFramework4.7" />
+      <frameworkAssembly assemblyName="System.Data" targetFramework=".NETFramework4.7" />
+      <frameworkAssembly assemblyName="System.Net.Http" targetFramework=".NETFramework4.7" />
+      <frameworkAssembly assemblyName="System" targetFramework=".NETFramework4.8" />
+      <frameworkAssembly assemblyName="System.Core" targetFramework=".NETFramework4.8" />
+      <frameworkAssembly assemblyName="System.Data" targetFramework=".NETFramework4.8" />
+      <frameworkAssembly assemblyName="System.Net.Http" targetFramework=".NETFramework4.8" />
+      <frameworkAssembly assemblyName="System" targetFramework="monoandroid" />
+      <frameworkAssembly assemblyName="System.Core" targetFramework="monoandroid" />
+      <frameworkAssembly assemblyName="System.Data" targetFramework="monoandroid" />
+      <frameworkAssembly assemblyName="System.Net.Http" targetFramework="monoandroid" />
+      <frameworkAssembly assemblyName="System" targetFramework="xamarinios" />
+      <frameworkAssembly assemblyName="System.Core" targetFramework="xamarinios" />
+      <frameworkAssembly assemblyName="System.Data" targetFramework="xamarinios" />
+      <frameworkAssembly assemblyName="System.Net.Http" targetFramework="xamarinios" />
+    </frameworkAssemblies>
+    <dependencies>
+      <group targetFramework="net45">
+        <dependency id="MimeKit" version="2.9.1" />
+      </group>
+      <group targetFramework="net46">
+        <dependency id="MimeKit" version="2.9.1" />
+      </group>
+      <group targetFramework="net47">
+        <dependency id="MimeKit" version="2.9.1" />
+      </group>
+      <group targetFramework="net48">
+        <dependency id="MimeKit" version="2.9.1" />
+      </group>
+      <group targetFramework="netstandard1.3">
+        <dependency id="System.Runtime.Serialization.Primitives" version="4.3.0" />
+        <dependency id="System.Net.NameResolution" version="4.3.0" />
+        <dependency id="System.Net.Security" version="4.3.2" />
+        <dependency id="MimeKit" version="2.9.1" />
+      </group>
+      <group targetFramework="netstandard1.6">
+        <dependency id="System.Runtime.Serialization.Primitives" version="4.3.0" />
+        <dependency id="System.Net.NameResolution" version="4.3.0" />
+        <dependency id="System.Net.Security" version="4.3.2" />
+        <dependency id="MimeKit" version="2.9.1" />
+      </group>
+      <group targetFramework="netstandard2.0">
+        <dependency id="System.Runtime.Serialization.Primitives" version="4.3.0" />
+        <dependency id="System.Net.NameResolution" version="4.3.0" />
+        <dependency id="System.Net.Security" version="4.3.2" />
+        <dependency id="MimeKit" version="2.9.1" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="..\MailKit\bin\Release\netstandard1.3\MailKit.dll" target="lib\netstandard1.3\MailKit.dll" />
+    <file src="..\MailKit\bin\Release\netstandard1.3\MailKit.pdb" target="lib\netstandard1.3\MailKit.pdb" />
+    <file src="..\MailKit\bin\Release\netstandard1.3\MailKit.xml" target="lib\netstandard1.3\MailKit.xml" />
+    <file src="..\MailKit\bin\Release\netstandard1.6\MailKit.dll" target="lib\netstandard1.6\MailKit.dll" />
+    <file src="..\MailKit\bin\Release\netstandard1.6\MailKit.pdb" target="lib\netstandard1.6\MailKit.pdb" />
+    <file src="..\MailKit\bin\Release\netstandard1.6\MailKit.xml" target="lib\netstandard1.6\MailKit.xml" />
+    <file src="..\MailKit\bin\Release\netstandard2.0\MailKit.dll" target="lib\netstandard2.0\MailKit.dll" />
+    <file src="..\MailKit\bin\Release\netstandard2.0\MailKit.pdb" target="lib\netstandard2.0\MailKit.pdb" />
+    <file src="..\MailKit\bin\Release\netstandard2.0\MailKit.xml" target="lib\netstandard2.0\MailKit.xml" />
+    <file src="..\MailKit\bin\Release\net45\MailKit.dll" target="lib\net45\MailKit.dll" />
+    <file src="..\MailKit\bin\Release\net45\MailKit.pdb" target="lib\net45\MailKit.pdb" />
+    <file src="..\MailKit\bin\Release\net45\MailKit.xml" target="lib\net45\MailKit.xml" />
+    <file src="..\MailKit\bin\Release\net46\MailKit.dll" target="lib\net46\MailKit.dll" />
+    <file src="..\MailKit\bin\Release\net46\MailKit.pdb" target="lib\net46\MailKit.pdb" />
+    <file src="..\MailKit\bin\Release\net46\MailKit.xml" target="lib\net46\MailKit.xml" />
+    <file src="..\MailKit\bin\Release\net47\MailKit.dll" target="lib\net47\MailKit.dll" />
+    <file src="..\MailKit\bin\Release\net47\MailKit.pdb" target="lib\net47\MailKit.pdb" />
+    <file src="..\MailKit\bin\Release\net47\MailKit.xml" target="lib\net47\MailKit.xml" />
+    <file src="..\MailKit\bin\Release\net48\MailKit.dll" target="lib\net48\MailKit.dll" />
+    <file src="..\MailKit\bin\Release\net48\MailKit.pdb" target="lib\net48\MailKit.pdb" />
+    <file src="..\MailKit\bin\Release\net48\MailKit.xml" target="lib\net48\MailKit.xml" />
+    <file src="mailkit-50.png" target="icons\mailkit-50.png" />
+  </files>
 </package>

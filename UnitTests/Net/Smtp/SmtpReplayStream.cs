@@ -1,9 +1,9 @@
 ﻿//
 // SmtpReplayStream.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2013-2014 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,8 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 
 using NUnit.Framework;
@@ -54,16 +56,20 @@ namespace UnitTests.Net.Smtp {
 	{
 		readonly MemoryStream sent = new MemoryStream ();
 		readonly IList<SmtpReplayCommand> commands;
+		int timeout = 100000;
 		SmtpReplayState state;
 		Stream stream;
 		bool disposed;
+		bool asyncIO;
+		bool isAsync;
 		int index;
 
-		public SmtpReplayStream (IList<SmtpReplayCommand> commands)
+		public SmtpReplayStream (IList<SmtpReplayCommand> commands, bool asyncIO)
 		{
 			stream = GetResourceStream (commands[0].Resource);
 			state = SmtpReplayState.SendResponse;
 			this.commands = commands;
+			this.asyncIO = asyncIO;
 		}
 
 		void CheckDisposed ()
@@ -86,6 +92,10 @@ namespace UnitTests.Net.Smtp {
 			get { return true; }
 		}
 
+		public override bool CanTimeout {
+			get { return true; }
+		}
+
 		public override long Length {
 			get { throw new NotSupportedException (); }
 		}
@@ -95,9 +105,25 @@ namespace UnitTests.Net.Smtp {
 			set { throw new NotSupportedException (); }
 		}
 
+		public override int ReadTimeout {
+			get { return timeout; }
+			set { timeout = value; }
+		}
+
+		public override int WriteTimeout {
+			get { return timeout; }
+			set { timeout = value; }
+		}
+
 		public override int Read (byte[] buffer, int offset, int count)
 		{
 			CheckDisposed ();
+
+			if (asyncIO) {
+				Assert.IsTrue (isAsync, "Trying to Read in an async unit test.");
+			} else {
+				Assert.IsFalse (isAsync, "Trying to ReadAsync in a non-async unit test.");
+			}
 
 			Assert.AreEqual (SmtpReplayState.SendResponse, state, "Trying to read when no command given.");
 			Assert.IsNotNull (stream, "Trying to read when no data available.");
@@ -114,6 +140,17 @@ namespace UnitTests.Net.Smtp {
 			return nread;
 		}
 
+		public override Task<int> ReadAsync (byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+		{
+			isAsync = true;
+
+			try {
+				return Task.FromResult (Read (buffer, offset, count));
+			} finally {
+				isAsync = false;
+			}
+		}
+
 		Stream GetResourceStream (string name)
 		{
 			return GetType ().Assembly.GetManifestResourceStream ("UnitTests.Net.Smtp.Resources." + name);
@@ -123,30 +160,76 @@ namespace UnitTests.Net.Smtp {
 		{
 			CheckDisposed ();
 
+			if (asyncIO) {
+				Assert.IsTrue (isAsync, "Trying to Write in an async unit test.");
+			} else {
+				Assert.IsFalse (isAsync, "Trying to WriteAsync in a non-async unit test.");
+			}
+
 			Assert.AreNotEqual (SmtpReplayState.SendResponse, state, "Trying to write when a command has already been given.");
 
 			sent.Write (buffer, offset, count);
 
 			if (sent.Length >= commands[index].Command.Length) {
-				var command = Encoding.UTF8.GetString (sent.GetBuffer (), 0, (int) sent.Length);
-
 				if (state == SmtpReplayState.WaitForCommand) {
+					var command = Encoding.UTF8.GetString (sent.GetBuffer (), 0, (int) sent.Length);
+
+					if (command.StartsWith ("MAIL FROM:", StringComparison.Ordinal)) {
+						var startIndex = command.IndexOf (" SIZE=", StringComparison.Ordinal);
+
+						if (index != -1) {
+							int endIndex = startIndex + " SIZE=".Length;
+
+							while (command[endIndex] != ' ' && command[endIndex] != '\r')
+								endIndex++;
+
+							command = command.Remove (startIndex, endIndex - startIndex);
+						}
+					}
+
 					Assert.AreEqual (commands[index].Command, command, "Commands did not match.");
 
 					stream = GetResourceStream (commands[index].Resource);
 					state = SmtpReplayState.SendResponse;
-				} else if (command == "\r\n.\r\n") {
-					stream = GetResourceStream (commands[index].Resource);
-					state = SmtpReplayState.SendResponse;
-				}
+					sent.SetLength (0);
+				} else if (sent.Length > 5) {
+					var command = Encoding.ASCII.GetString (sent.GetBuffer (), (int) sent.Length - 5, 5);
 
-				sent.SetLength (0);
+					if (command == "\r\n.\r\n") {
+						stream = GetResourceStream (commands[index].Resource);
+						state = SmtpReplayState.SendResponse;
+						sent.SetLength (0);
+					}
+				}
+			}
+		}
+
+		public override Task WriteAsync (byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+		{
+			isAsync = true;
+
+			try {
+				Write (buffer, offset, count);
+				return Task.FromResult (true);
+			} finally {
+				isAsync = false;
 			}
 		}
 
 		public override void Flush ()
 		{
 			CheckDisposed ();
+
+			Assert.IsFalse (asyncIO, "Trying to Flush in an async unit test.");
+		}
+
+		public override Task FlushAsync (CancellationToken cancellationToken)
+		{
+			CheckDisposed ();
+
+			Assert.IsTrue (asyncIO, "Trying to FlushAsync in a non-async unit test.");
+
+			return Task.FromResult (true);
 		}
 
 		public override long Seek (long offset, SeekOrigin origin)

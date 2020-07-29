@@ -1,9 +1,9 @@
 ﻿//
 // HMACMD5.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2014 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2017 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,15 +26,15 @@
 
 using System;
 using System.IO;
-using Windows.Security.Cryptography;
-using Windows.Security.Cryptography.Core;
 
-namespace MailKit.Security.Ntlm
-{
+using Org.BouncyCastle.Crypto.Macs;
+using Org.BouncyCastle.Crypto.Digests;
+using Org.BouncyCastle.Crypto.Parameters;
+
+namespace MailKit.Security.Ntlm {
 	class HMACMD5 : IDisposable
 	{
-		MacAlgorithmProvider algorithm;
-		CryptographicHash hash;
+		readonly HMac hash = new HMac (new MD5Digest ());
 		byte[] hashValue, key;
 		bool disposed;
 
@@ -48,7 +48,8 @@ namespace MailKit.Security.Ntlm
 			Dispose (false);
 		}
 
-		public byte[] Hash {
+		public byte[] Hash
+		{
 			get {
 				if (hashValue == null)
 					throw new InvalidOperationException ("No hash value computed.");
@@ -61,7 +62,7 @@ namespace MailKit.Security.Ntlm
 			get { return key; }
 			set {
 				if (value == null)
-					throw new ArgumentNullException ("value");
+					throw new ArgumentNullException (nameof (value));
 
 				if (key != null)
 					Array.Clear (key, 0, key.Length);
@@ -73,30 +74,22 @@ namespace MailKit.Security.Ntlm
 
 		void HashCore (byte[] block, int offset, int size)
 		{
-			var array = new byte[size];
-
-			Buffer.BlockCopy (block, offset, array, 0, size);
-
-			var buffer = CryptographicBuffer.CreateFromByteArray (array);
-			hash.Append (buffer);
+			hash.BlockUpdate (block, offset, size);
 		}
 
 		byte[] HashFinal ()
 		{
-			var buffer = hash.GetValueAndReset ();
-			byte[] value;
+			var value = new byte[hash.GetMacSize ()];
 
-			CryptographicBuffer.CopyToByteArray (buffer, out value);
+			hash.DoFinal (value, 0);
+			hash.Reset ();
 
 			return value;
 		}
 
 		public void Initialize ()
 		{
-			var buffer = CryptographicBuffer.CreateFromByteArray (Key);
-
-			algorithm = MacAlgorithmProvider.OpenAlgorithm (MacAlgorithmNames.HmacMd5);
-			hash = algorithm.CreateHash (buffer);
+			hash.Init (new KeyParameter (Key));
 		}
 
 		public void Clear ()
@@ -107,13 +100,13 @@ namespace MailKit.Security.Ntlm
 		public byte[] ComputeHash (byte[] buffer, int offset, int count)
 		{
 			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
+				throw new ArgumentNullException (nameof (buffer));
 
 			if (offset < 0 || offset > buffer.Length)
-				throw new ArgumentOutOfRangeException ("offset");
+				throw new ArgumentOutOfRangeException (nameof (offset));
 
 			if (count < 0 || offset > buffer.Length - count)
-				throw new ArgumentOutOfRangeException ("count");
+				throw new ArgumentOutOfRangeException (nameof (count));
 
 			if (disposed)
 				throw new ObjectDisposedException ("HashAlgorithm");
@@ -127,7 +120,7 @@ namespace MailKit.Security.Ntlm
 		public byte[] ComputeHash (byte[] buffer)
 		{
 			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
+				throw new ArgumentNullException (nameof (buffer));
 
 			return ComputeHash (buffer, 0, buffer.Length);
 		}
@@ -154,17 +147,17 @@ namespace MailKit.Security.Ntlm
 		public int TransformBlock (byte[] inputBuffer, int inputOffset, int inputCount, byte[] outputBuffer, int outputOffset)
 		{
 			if (inputBuffer == null)
-				throw new ArgumentNullException ("inputBuffer");
+				throw new ArgumentNullException (nameof (inputBuffer));
 
 			if (inputOffset < 0 || inputOffset > inputBuffer.Length)
-				throw new ArgumentOutOfRangeException ("inputOffset");
+				throw new ArgumentOutOfRangeException (nameof (inputOffset));
 
 			if (inputCount < 0 || inputOffset > inputBuffer.Length - inputCount)
-				throw new ArgumentOutOfRangeException ("inputCount");
+				throw new ArgumentOutOfRangeException (nameof (inputCount));
 
 			if (outputBuffer != null) {
 				if (outputOffset < 0 || outputOffset > outputBuffer.Length - inputCount)
-					throw new ArgumentOutOfRangeException ("outputOffset");
+					throw new ArgumentOutOfRangeException (nameof (outputOffset));
 			}
 
 			HashCore (inputBuffer, inputOffset, inputCount);
@@ -178,7 +171,7 @@ namespace MailKit.Security.Ntlm
 		public byte[] TransformFinalBlock (byte[] inputBuffer, int inputOffset, int inputCount)
 		{
 			if (inputCount < 0)
-				throw new ArgumentOutOfRangeException ("inputCount");
+				throw new ArgumentOutOfRangeException (nameof (inputCount));
 
 			var outputBuffer = new byte[inputCount];
 
@@ -193,9 +186,9 @@ namespace MailKit.Security.Ntlm
 
 		void Dispose (bool disposing)
 		{
-			if (Key != null) {
-				Array.Clear (Key, 0, Key.Length);
-				Key = null;
+			if (key != null) {
+				Array.Clear (key, 0, Key.Length);
+				key = null;
 			}
 		}
 

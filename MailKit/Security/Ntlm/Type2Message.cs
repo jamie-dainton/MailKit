@@ -1,4 +1,4 @@
-//
+﻿//
 // Mono.Security.Protocol.Ntlm.Type2Message - Challenge
 //
 // Authors: Sebastien Pouliot <sebastien@ximian.com>
@@ -6,7 +6,7 @@
 //
 // Copyright (c) 2003 Motus Technologies Inc. (http://www.motus.com)
 // Copyright (c) 2004 Novell, Inc (http://www.novell.com)
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // References
 // a.	NTLM Authentication Scheme for HTTP, Ronald Tschalär
@@ -36,12 +36,7 @@
 
 using System;
 using System.Text;
-
-#if !NETFX_CORE
 using System.Security.Cryptography;
-#else
-using Encoding = Portable.Text.Encoding;
-#endif
 
 namespace MailKit.Security.Ntlm {
 	class Type2Message : MessageBase
@@ -51,7 +46,7 @@ namespace MailKit.Security.Ntlm {
 
 		public Type2Message () : base (2)
 		{
-			Flags = (NtlmFlags) 0x8201;
+			Flags = NtlmFlags.NegotiateNtlm | NtlmFlags.NegotiateUnicode /*| NtlmFlags.NegotiateAlwaysSign*/;
 			nonce = new byte[8];
 
 			using (var rng = RandomNumberGenerator.Create ())
@@ -74,25 +69,30 @@ namespace MailKit.Security.Ntlm {
 			get { return (byte[]) nonce.Clone (); }
 			set { 
 				if (value == null)
-					throw new ArgumentNullException ("value");
+					throw new ArgumentNullException (nameof (value));
 
 				if (value.Length != 8)
-					throw new ArgumentException ("Invalid Nonce Length (should be 8 bytes).", "value");
+					throw new ArgumentException ("Invalid Nonce Length (should be 8 bytes).", nameof (value));
 
 				nonce = (byte[]) value.Clone (); 
 			}
 		}
 
 		public string TargetName {
-			get; private set;
+			get; set;
 		}
 
 		public TargetInfo TargetInfo {
-			get; private set;
+			get; set;
 		}
 
 		public byte[] EncodedTargetInfo {
-			get { return (byte[]) targetInfo.Clone (); }
+			get {
+				if (targetInfo != null)
+					return (byte[]) targetInfo.Clone ();
+
+				return new byte[0];
+			}
 		}
 
 		void Decode (byte[] message, int startIndex, int length)
@@ -107,20 +107,19 @@ namespace MailKit.Security.Ntlm {
 			var targetNameOffset = BitConverterLE.ToUInt16 (message, startIndex + 16);
 
 			if (targetNameLength > 0) {
-				if ((Flags & NtlmFlags.NegotiateOem) != 0)
-					TargetName = Encoding.ASCII.GetString (message, startIndex + targetNameOffset, targetNameLength);
-				else
-					TargetName = Encoding.Unicode.GetString (message, startIndex + targetNameOffset, targetNameLength);
+				var encoding = (Flags & NtlmFlags.NegotiateUnicode) != 0 ? Encoding.Unicode : Encoding.UTF8;
+
+				TargetName = encoding.GetString (message, startIndex + targetNameOffset, targetNameLength);
 			}
-			
+
 			// The Target Info block is optional.
-			if (message.Length >= 48) {
+			if (length >= 48 && targetNameOffset >= 48) {
 				var targetInfoLength = BitConverterLE.ToUInt16 (message, startIndex + 40);
 				var targetInfoOffset = BitConverterLE.ToUInt16 (message, startIndex + 44);
 
-				TargetInfo = new TargetInfo (message, targetInfoOffset, targetInfoLength, (Flags & NtlmFlags.NegotiateUnicode) != 0);
+				if (targetInfoLength > 0 && targetInfoOffset < length && targetInfoLength <= (length - targetInfoOffset)) {
+					TargetInfo = new TargetInfo (message, startIndex + targetInfoOffset, targetInfoLength, (Flags & NtlmFlags.NegotiateOem) == 0);
 
-				if (targetInfoLength > 0) {
 					targetInfo = new byte[targetInfoLength];
 					Buffer.BlockCopy (message, startIndex + targetInfoOffset, targetInfo, 0, targetInfoLength);
 				}
@@ -129,7 +128,27 @@ namespace MailKit.Security.Ntlm {
 
 		public override byte[] Encode ()
 		{
-			byte[] data = PrepareMessage (40);
+			int targetNameOffset = 40;
+			int targetInfoOffset = 48;
+			byte[] targetName = null;
+			int size = 40;
+
+			if (TargetName != null) {
+				var encoding = (Flags & NtlmFlags.NegotiateUnicode) != 0 ? Encoding.Unicode : Encoding.UTF8;
+
+				targetName = encoding.GetBytes (TargetName);
+				targetInfoOffset += targetName.Length;
+				size += targetName.Length;
+			}
+
+			if (TargetInfo != null || targetInfo != null) {
+				if (targetInfo == null)
+					targetInfo = TargetInfo.Encode ((Flags & NtlmFlags.NegotiateUnicode) != 0);
+				size += targetInfo.Length + 8;
+				targetNameOffset += 8;
+			}
+
+			var data = PrepareMessage (size);
 
 			// message length
 			short length = (short) data.Length;
@@ -143,6 +162,28 @@ namespace MailKit.Security.Ntlm {
 			data[23] = (byte)((uint) Flags >> 24);
 
 			Buffer.BlockCopy (nonce, 0, data, 24, nonce.Length);
+
+			if (targetName != null) {
+				data[12] = (byte) targetName.Length;
+				data[13] = (byte)(targetName.Length >> 8);
+				data[14] = (byte)targetName.Length;
+				data[15] = (byte)(targetName.Length >> 8);
+				data[16] = (byte) targetNameOffset;
+				data[17] = (byte)(targetNameOffset >> 8);
+
+				Buffer.BlockCopy (targetName, 0, data, targetNameOffset, targetName.Length);
+			}
+
+			if (targetInfo != null) {
+				data[40] = (byte) targetInfo.Length;
+				data[41] = (byte)(targetInfo.Length >> 8);
+				data[42] = (byte) targetInfo.Length;
+				data[43] = (byte)(targetInfo.Length >> 8);
+				data[44] = (byte) targetInfoOffset;
+				data[45] = (byte)(targetInfoOffset >> 8);
+
+				Buffer.BlockCopy (targetInfo, 0, data, targetInfoOffset, targetInfo.Length);
+			}
 
 			return data;
 		}

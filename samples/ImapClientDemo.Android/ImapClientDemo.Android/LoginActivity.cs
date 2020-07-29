@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,66 +27,69 @@
 using System;
 
 using Android.App;
-using Android.Content;
 using Android.OS;
-using Android.Runtime;
-using Android.Views;
 using Android.Widget;
 
 namespace ImapClientDemo
 {
-    [Activity (Label = "Login")]			
-    public class LoginActivity : Activity
-    {
-        TextView textServer;
-        TextView textPort;
-        TextView textLogin;
-        TextView textPassword;
-        CheckBox checkSsl;
-        Button buttonLogin;
+	[Activity (Label = "Login")]			
+	public class LoginActivity : Activity
+	{
+		TextView textServer;
+		TextView textPort;
+		TextView textLogin;
+		TextView textPassword;
+		CheckBox checkSsl;
+		Button buttonLogin;
 
-        protected override void OnCreate (Bundle bundle)
-        {
-            base.OnCreate (bundle);
+		protected override void OnCreate (Bundle bundle)
+		{
+			base.OnCreate (bundle);
 
-            SetContentView (Resource.Layout.LoginLayout);
+			SetContentView (Resource.Layout.LoginLayout);
 
-            textServer = FindViewById<TextView> (Resource.Id.textServer);
-            textPort = FindViewById<TextView> (Resource.Id.textPort);
-            textLogin = FindViewById<TextView> (Resource.Id.textLogin);
-            textPassword = FindViewById<TextView> (Resource.Id.textPassword);
-            checkSsl = FindViewById<CheckBox> (Resource.Id.checkSsl);
-            buttonLogin = FindViewById<Button> (Resource.Id.buttonLogin);
+			textServer = FindViewById<TextView> (Resource.Id.textServer);
+			textPort = FindViewById<TextView> (Resource.Id.textPort);
+			textLogin = FindViewById<TextView> (Resource.Id.textLogin);
+			textPassword = FindViewById<TextView> (Resource.Id.textPassword);
+			checkSsl = FindViewById<CheckBox> (Resource.Id.checkSsl);
+			buttonLogin = FindViewById<Button> (Resource.Id.buttonLogin);
 
-            buttonLogin.Click += buttonLogin_Click;
-        }
+			buttonLogin.Click += buttonLogin_Click;
+		}
 
-        async void buttonLogin_Click (object sender, EventArgs e)
-        {
-			int port;
+		async void buttonLogin_Click (object sender, EventArgs e)
+		{
+			buttonLogin.Enabled = false;
 
-            buttonLogin.Enabled = false;
+			int.TryParse (textPort.Text, out var port);
 
-            int.TryParse (textPort.Text, out port);
+			try {
+				// Note: for demo purposes, we're ignoring SSL validation errors (don't do this in production code)
+				Mail.Client.ServerCertificateValidationCallback = (s, certificate, chain, sslPolicyErrors) => true;
 
-            try {
-                await Mail.Client.ConnectAsync (textServer.Text, port, checkSsl.Checked);
+				await Mail.Client.ConnectAsync (textServer.Text, port, checkSsl.Checked);
 
-                Mail.Client.AuthenticationMechanisms.Remove ("XOAUTH2");
+				try { 
+					await Mail.Client.AuthenticateAsync (textLogin.Text, textPassword.Text); 
 
-                try { 
-                    await Mail.Client.AuthenticateAsync (textLogin.Text, textPassword.Text); 
+					StartActivity (typeof (FoldersActivity));
+				} catch {
+					Toast.MakeText (this,
+						"Failed to Authenticate to server. If you are using GMail, then you probably " +
+						"need to go into your GMail settings to enable \"less secure apps\" in order " + 
+						"to get this demo to work.\n\n" +
+						"For a real Mail application, you'll want to add support for obtaining the " +
+						"user's OAuth2 credentials to prevent the need for user's to enable this, but " +
+						"that is beyond the scope of this demo.",
+						ToastLength.Long).Show ();
+				}
+			} catch (Exception ex) {
+				Console.WriteLine (ex);
+				Toast.MakeText (this, "Failed to Connect!", ToastLength.Short).Show ();
+			}
 
-                    StartActivity (typeof (FoldersActivity));
-                } catch {
-                    Toast.MakeText (this, "Failed to Authenticate!", ToastLength.Short).Show ();
-                }
-            } catch (Exception ex) {
-                Console.WriteLine (ex);
-                Toast.MakeText (this, "Failed to Connect!", ToastLength.Short).Show ();
-            }
-
-            buttonLogin.Enabled = true;
-        }
-    }
+			buttonLogin.Enabled = true;
+		}
+	}
 }

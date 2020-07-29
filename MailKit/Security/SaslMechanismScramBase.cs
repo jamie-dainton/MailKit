@@ -1,9 +1,9 @@
 ﻿//
 // SaslMechanismScramBase.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,13 +27,9 @@
 using System;
 using System.Net;
 using System.Text;
+using System.Globalization;
 using System.Collections.Generic;
-
-#if NETFX_CORE
-using Encoding = Portable.Text.Encoding;
-#else
 using System.Security.Cryptography;
-#endif
 
 namespace MailKit.Security {
 	/// <summary>
@@ -50,10 +46,10 @@ namespace MailKit.Security {
 			Validate
 		}
 
+		internal string cnonce;
 		string client, server;
 		byte[] salted, auth;
 		LoginState state;
-		string cnonce;
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MailKit.Security.SaslMechanismScramBase"/> class.
@@ -63,15 +59,14 @@ namespace MailKit.Security {
 		/// </remarks>
 		/// <param name="uri">The URI of the service.</param>
 		/// <param name="credentials">The user's credentials.</param>
-		/// <param name="entropy">Random characters to act as the cnonce token.</param>
 		/// <exception cref="System.ArgumentNullException">
 		/// <para><paramref name="uri"/> is <c>null</c>.</para>
 		/// <para>-or-</para>
 		/// <para><paramref name="credentials"/> is <c>null</c>.</para>
 		/// </exception>
-		internal protected SaslMechanismScramBase (Uri uri, ICredentials credentials, string entropy) : base (uri, credentials)
+		[Obsolete ("Use SaslMechanismScramBase(NetworkCredential) instead.")]
+		protected SaslMechanismScramBase (Uri uri, ICredentials credentials) : base (uri, credentials)
 		{
-			cnonce = entropy;
 		}
 
 		/// <summary>
@@ -81,13 +76,48 @@ namespace MailKit.Security {
 		/// Creates a new SCRAM-based SASL context.
 		/// </remarks>
 		/// <param name="uri">The URI of the service.</param>
-		/// <param name="credentials">The user's credentials.</param>
+		/// <param name="userName">The user name.</param>
+		/// <param name="password">The password.</param>
 		/// <exception cref="System.ArgumentNullException">
 		/// <para><paramref name="uri"/> is <c>null</c>.</para>
 		/// <para>-or-</para>
-		/// <para><paramref name="credentials"/> is <c>null</c>.</para>
+		/// <para><paramref name="userName"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="password"/> is <c>null</c>.</para>
 		/// </exception>
-		protected SaslMechanismScramBase (Uri uri, ICredentials credentials) : base (uri, credentials)
+		[Obsolete ("Use SaslMechanismScramBase(string, string) instead.")]
+		protected SaslMechanismScramBase (Uri uri, string userName, string password) : base (uri, userName, password)
+		{
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="MailKit.Security.SaslMechanismScramBase"/> class.
+		/// </summary>
+		/// <remarks>
+		/// Creates a new SCRAM-based SASL context.
+		/// </remarks>
+		/// <param name="credentials">The user's credentials.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="credentials"/> is <c>null</c>.
+		/// </exception>
+		protected SaslMechanismScramBase (NetworkCredential credentials) : base (credentials)
+		{
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="MailKit.Security.SaslMechanismScramBase"/> class.
+		/// </summary>
+		/// <remarks>
+		/// Creates a new SCRAM-based SASL context.
+		/// </remarks>
+		/// <param name="userName">The user name.</param>
+		/// <param name="password">The password.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <para><paramref name="userName"/> is <c>null</c>.</para>
+		/// <para>-or-</para>
+		/// <para><paramref name="password"/> is <c>null</c>.</para>
+		/// </exception>
+		protected SaslMechanismScramBase (string userName, string password) : base (userName, password)
 		{
 		}
 
@@ -253,21 +283,12 @@ namespace MailKit.Security {
 			if (IsAuthenticated)
 				throw new InvalidOperationException ();
 
-			var cred = Credentials.GetCredential (Uri, MechanismName);
 			byte[] response, signature;
 
 			switch (state) {
 			case LoginState.Initial:
-				if (string.IsNullOrEmpty (cnonce)) {
-					var entropy = new byte[18];
-
-					using (var rng = RandomNumberGenerator.Create ())
-						rng.GetBytes (entropy);
-
-					cnonce = Convert.ToBase64String (entropy);
-				}
-
-				client = "n=" + Normalize (cred.UserName) + ",r=" + cnonce;
+				cnonce = cnonce ?? GenerateEntropy (18);
+				client = "n=" + Normalize (Credentials.UserName) + ",r=" + cnonce;
 				response = Encoding.UTF8.GetBytes ("n,," + client);
 				state = LoginState.Final;
 				break;
@@ -289,11 +310,12 @@ namespace MailKit.Security {
 				if (!nonce.StartsWith (cnonce, StringComparison.Ordinal))
 					throw new SaslException (MechanismName, SaslErrorCode.InvalidChallenge, "Challenge contained an invalid nonce.");
 
-				if (!int.TryParse (iterations, out count) || count < 1)
+				if (!int.TryParse (iterations, NumberStyles.None, CultureInfo.InvariantCulture, out count) || count < 1)
 					throw new SaslException (MechanismName, SaslErrorCode.InvalidChallenge, "Challenge contained an invalid iteration count.");
 
-				var password = Encoding.UTF8.GetBytes (SaslPrep (cred.Password));
+				var password = Encoding.UTF8.GetBytes (SaslPrep (Credentials.Password));
 				salted = Hi (password, Convert.FromBase64String (salt), count);
+				Array.Clear (password, 0, password.Length);
 
 				var withoutProof = "c=" + Convert.ToBase64String (Encoding.ASCII.GetBytes ("n,,")) + ",r=" + nonce;
 				auth = Encoding.UTF8.GetBytes (client + "," + server + "," + withoutProof);

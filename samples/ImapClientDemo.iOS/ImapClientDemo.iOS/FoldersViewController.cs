@@ -3,7 +3,7 @@
 //
 // Author: Jeffrey Stedfast <jeff@xamarin.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 Xamarin Inc. (www.xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -64,10 +64,13 @@ namespace ImapClientDemo.iOS
         // Recursive function to load all folders and their subfolders
         async Task LoadChildFolders (Section foldersSection, IMailFolder folder)
         {
-            if (!folder.IsNamespace) {    
+            if (!folder.IsNamespace) {
                 foldersSection.Add (new StyledStringElement (folder.FullName, () =>
                     OpenFolder (folder)));
             }
+
+			if (folder.Attributes.HasFlag (FolderAttributes.HasNoChildren))
+				return;
 
             var subfolders = await folder.GetSubfoldersAsync ();
 

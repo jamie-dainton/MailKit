@@ -1,9 +1,9 @@
-//
+﻿//
 // SmtpCommandException.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,7 @@
 
 using System;
 #if SERIALIZABLE
+using System.Security;
 using System.Runtime.Serialization;
 #endif
 
@@ -94,25 +95,21 @@ namespace MailKit.Net.Smtp {
 		/// </remarks>
 		/// <param name="info">The serialization info.</param>
 		/// <param name="context">The streaming context.</param>
+		/// <exception cref="System.ArgumentNullException">
+		/// <paramref name="info"/> is <c>null</c>.
+		/// </exception>
+		[SecuritySafeCritical]
 		protected SmtpCommandException (SerializationInfo info, StreamingContext context) : base (info, context)
 		{
 			MailboxAddress mailbox;
-			SmtpErrorCode code;
 			string value;
 
 			value = info.GetString ("Mailbox");
 			if (!string.IsNullOrEmpty (value) && MailboxAddress.TryParse (value, out mailbox))
 				Mailbox = mailbox;
 
-			value = info.GetString ("ErrorCode");
-			if (!Enum.TryParse (value, out code))
-				ErrorCode = SmtpErrorCode.MessageNotAccepted;
-			else
-				ErrorCode = code;
-
-			ErrorCode = (SmtpErrorCode) info.GetInt32 ("ErrorCode");
-
-			StatusCode = info.GetInt32 ("StatusCode");
+			ErrorCode = (SmtpErrorCode) info.GetValue ("ErrorCode", typeof (SmtpErrorCode));
+			StatusCode = (SmtpStatusCode) info.GetValue ("StatusCode", typeof (SmtpStatusCode));
 		}
 #endif
 
@@ -126,9 +123,27 @@ namespace MailKit.Net.Smtp {
 		/// <param name="status">The status code.</param>
 		/// <param name="mailbox">The rejected mailbox.</param>
 		/// <param name="message">The error message.</param>
-		internal SmtpCommandException (SmtpErrorCode code, SmtpStatusCode status, MailboxAddress mailbox, string message) : base (message)
+		/// <param name="innerException">The inner exception.</param>
+		public SmtpCommandException (SmtpErrorCode code, SmtpStatusCode status, MailboxAddress mailbox, string message, Exception innerException) : base (message, innerException)
 		{
-			StatusCode = (int) status;
+			StatusCode = status;
+			Mailbox = mailbox;
+			ErrorCode = code;
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="MailKit.Net.Smtp.SmtpCommandException"/> class.
+		/// </summary>
+		/// <remarks>
+		/// Creates a new <see cref="SmtpCommandException"/>.
+		/// </remarks>
+		/// <param name="code">The error code.</param>
+		/// <param name="status">The status code.</param>
+		/// <param name="mailbox">The rejected mailbox.</param>
+		/// <param name="message">The error message.</param>
+		public SmtpCommandException (SmtpErrorCode code, SmtpStatusCode status, MailboxAddress mailbox, string message) : base (message)
+		{
+			StatusCode = status;
 			Mailbox = mailbox;
 			ErrorCode = code;
 		}
@@ -142,9 +157,25 @@ namespace MailKit.Net.Smtp {
 		/// <param name="code">The error code.</param>
 		/// <param name="status">The status code.</param>>
 		/// <param name="message">The error message.</param>
-		internal SmtpCommandException (SmtpErrorCode code, SmtpStatusCode status, string message) : base (message)
+		/// <param name="innerException">The inner exception.</param>
+		public SmtpCommandException (SmtpErrorCode code, SmtpStatusCode status, string message, Exception innerException) : base (message, innerException)
 		{
-			StatusCode = (int) status;
+			StatusCode = status;
+			ErrorCode = code;
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="MailKit.Net.Smtp.SmtpCommandException"/> class.
+		/// </summary>
+		/// <remarks>
+		/// Creates a new <see cref="SmtpCommandException"/>.
+		/// </remarks>
+		/// <param name="code">The error code.</param>
+		/// <param name="status">The status code.</param>>
+		/// <param name="message">The error message.</param>
+		public SmtpCommandException (SmtpErrorCode code, SmtpStatusCode status, string message) : base (message)
+		{
+			StatusCode = status;
 			ErrorCode = code;
 		}
 
@@ -161,18 +192,18 @@ namespace MailKit.Net.Smtp {
 		/// <exception cref="System.ArgumentNullException">
 		/// <paramref name="info"/> is <c>null</c>.
 		/// </exception>
+		[SecurityCritical]
 		public override void GetObjectData (SerializationInfo info, StreamingContext context)
 		{
-			if (info == null)
-				throw new ArgumentNullException ("info");
+			base.GetObjectData (info, context);
 
 			if (Mailbox != null)
 				info.AddValue ("Mailbox", Mailbox.ToString ());
+			else
+				info.AddValue ("Mailbox", string.Empty);
 
-			info.AddValue ("ErrorCode", ErrorCode.ToString ());
-			info.AddValue ("StatusCode", StatusCode);
-
-			base.GetObjectData (info, context);
+			info.AddValue ("ErrorCode", ErrorCode, typeof (SmtpErrorCode));
+			info.AddValue ("StatusCode", StatusCode, typeof (SmtpStatusCode));
 		}
 #endif
 
@@ -220,7 +251,7 @@ namespace MailKit.Net.Smtp {
 		/// <code language="c#" source="Examples\SmtpExamples.cs" region="ExceptionHandling"/>
 		/// </example>
 		/// <value>The status code.</value>
-		public int StatusCode {
+		public SmtpStatusCode StatusCode {
 			get; private set;
 		}
 	}

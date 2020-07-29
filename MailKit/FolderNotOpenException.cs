@@ -1,9 +1,9 @@
 ﻿//
 // FolderNotOpenException.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -87,7 +87,7 @@ namespace MailKit {
 		public FolderNotOpenException (string folderName, FolderAccess access, string message, Exception innerException) : base (message, innerException)
 		{
 			if (folderName == null)
-				throw new ArgumentNullException ("folderName");
+				throw new ArgumentNullException (nameof (folderName));
 
 			FolderName = folderName;
 			FolderAccess = access;
@@ -108,7 +108,7 @@ namespace MailKit {
 		public FolderNotOpenException (string folderName, FolderAccess access, string message) : base (message)
 		{
 			if (folderName == null)
-				throw new ArgumentNullException ("folderName");
+				throw new ArgumentNullException (nameof (folderName));
 
 			FolderName = folderName;
 			FolderAccess = access;
@@ -174,13 +174,10 @@ namespace MailKit {
 		/// </exception>
 		public override void GetObjectData (SerializationInfo info, StreamingContext context)
 		{
-			if (info == null)
-				throw new ArgumentNullException ("info");
+			base.GetObjectData (info, context);
 
 			info.AddValue ("FolderAccess", FolderAccess.ToString ());
 			info.AddValue ("FolderName", FolderName);
-
-			base.GetObjectData (info, context);
 		}
 #endif
 	}

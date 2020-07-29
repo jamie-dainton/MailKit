@@ -1,9 +1,9 @@
 ﻿//
 // MessageSorter.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -99,6 +99,17 @@ namespace MailKit {
 
 				for (int i = 0; i < orderBy.Count; i++) {
 					switch (orderBy[i].Type) {
+					case OrderByType.Annotation:
+						var annotation = (OrderByAnnotation) orderBy[i];
+
+						var xannotation = x.Annotations?.FirstOrDefault (a => a.Entry == annotation.Entry);
+						var yannotation = y.Annotations?.FirstOrDefault (a => a.Entry == annotation.Entry);
+
+						var xvalue = xannotation?.Properties[annotation.Attribute] ?? string.Empty;
+						var yvalue = yannotation?.Properties[annotation.Attribute] ?? string.Empty;
+
+						cmp = string.Compare (xvalue, yvalue, StringComparison.OrdinalIgnoreCase);
+						break;
 					case OrderByType.Arrival:
 						cmp = x.Index.CompareTo (y.Index);
 						break;
@@ -113,6 +124,12 @@ namespace MailKit {
 						break;
 					case OrderByType.From:
 						cmp = CompareMailboxAddresses (x.Envelope.From, y.Envelope.From);
+						break;
+					case OrderByType.ModSeq:
+						var xmodseq = x.ModSeq ?? 0;
+						var ymodseq = y.ModSeq ?? 0;
+
+						cmp = xmodseq.CompareTo (ymodseq);
 						break;
 					case OrderByType.Size:
 						var xsize = x.Size ?? 0;
@@ -146,6 +163,38 @@ namespace MailKit {
 			#endregion
 		}
 
+		static MessageSummaryItems GetMessageSummaryItems (IList<OrderBy> orderBy)
+		{
+			var items = MessageSummaryItems.None;
+
+			for (int i = 0; i < orderBy.Count; i++) {
+				switch (orderBy[i].Type) {
+				case OrderByType.Annotation:
+					items |= MessageSummaryItems.Annotations;
+					break;
+				case OrderByType.Arrival:
+					break;
+				case OrderByType.Cc:
+				case OrderByType.Date:
+				case OrderByType.DisplayFrom:
+				case OrderByType.DisplayTo:
+				case OrderByType.From:
+				case OrderByType.Subject:
+				case OrderByType.To:
+					items |= MessageSummaryItems.Envelope;
+					break;
+				case OrderByType.ModSeq:
+					items |= MessageSummaryItems.ModSeq;
+					break;
+				case OrderByType.Size:
+					items |= MessageSummaryItems.Size;
+					break;
+				}
+			}
+
+			return items;
+		}
+
 		/// <summary>
 		/// Sorts the messages by the specified ordering.
 		/// </summary>
@@ -153,7 +202,7 @@ namespace MailKit {
 		/// Sorts the messages by the specified ordering.
 		/// </remarks>
 		/// <returns>The sorted messages.</returns>
-		/// <typeparam name="T">The message items must implement the <see cref="ISortable"/> interface.</typeparam>
+		/// <typeparam name="T">The message items must implement the <see cref="IMessageSummary"/> interface.</typeparam>
 		/// <param name="messages">The messages to sort.</param>
 		/// <param name="orderBy">The sort ordering.</param>
 		/// <exception cref="System.ArgumentNullException">
@@ -169,18 +218,20 @@ namespace MailKit {
 		public static IList<T> Sort<T> (this IEnumerable<T> messages, IList<OrderBy> orderBy) where T : IMessageSummary
 		{
 			if (messages == null)
-				throw new ArgumentNullException ("messages");
+				throw new ArgumentNullException (nameof (messages));
 
 			if (orderBy == null)
-				throw new ArgumentNullException ("orderBy");
+				throw new ArgumentNullException (nameof (orderBy));
 
 			if (orderBy.Count == 0)
-				throw new ArgumentException ("No sort order provided.", "orderBy");
+				throw new ArgumentException ("No sort order provided.", nameof (orderBy));
 
+			var requiredFields = GetMessageSummaryItems (orderBy);
 			var list = new List<T> ();
+
 			foreach (var message in messages) {
-				if (message.Envelope == null)
-					throw new ArgumentException ("One or more messages is missing information needed for sorting.", "messages");
+				if ((message.Fields & requiredFields) != requiredFields)
+					throw new ArgumentException ("One or more messages is missing information needed for sorting.", nameof (messages));
 
 				list.Add (message);
 			}
@@ -202,7 +253,7 @@ namespace MailKit {
 		/// Sorts the messages by the specified ordering.
 		/// </remarks>
 		/// <returns>The sorted messages.</returns>
-		/// <typeparam name="T">The message items must implement the <see cref="ISortable"/> interface.</typeparam>
+		/// <typeparam name="T">The message items must implement the <see cref="IMessageSummary"/> interface.</typeparam>
 		/// <param name="messages">The messages to sort.</param>
 		/// <param name="orderBy">The sort ordering.</param>
 		/// <exception cref="System.ArgumentNullException">
@@ -218,17 +269,19 @@ namespace MailKit {
 		public static void Sort<T> (this List<T> messages, IList<OrderBy> orderBy) where T : IMessageSummary
 		{
 			if (messages == null)
-				throw new ArgumentNullException ("messages");
+				throw new ArgumentNullException (nameof (messages));
 
 			if (orderBy == null)
-				throw new ArgumentNullException ("orderBy");
+				throw new ArgumentNullException (nameof (orderBy));
 
 			if (orderBy.Count == 0)
-				throw new ArgumentException ("No sort order provided.", "orderBy");
+				throw new ArgumentException ("No sort order provided.", nameof (orderBy));
+
+			var requiredFields = GetMessageSummaryItems (orderBy);
 
 			for (int i = 0; i < messages.Count; i++) {
-				if (messages[i].Envelope == null)
-					throw new ArgumentException ("One or more messages is missing information needed for sorting.", "messages");
+				if ((messages[i].Fields & requiredFields) != requiredFields)
+					throw new ArgumentException ("One or more messages is missing information needed for sorting.", nameof (messages));
 			}
 
 			if (messages.Count < 2)

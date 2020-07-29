@@ -1,9 +1,9 @@
 ﻿//
 // MessageEventArgs.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -35,9 +35,42 @@ namespace MailKit {
 	/// </remarks>
 	public class MessageEventArgs : EventArgs
 	{
-		internal MessageEventArgs (int index)
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:MailKit.MessageEventArgs"/> class.
+		/// </summary>
+		/// <remarks>
+		/// Creates a new <see cref="MessageEventArgs"/>.
+		/// </remarks>
+		/// <param name="index">The message index.</param>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="index"/> is out of range.
+		/// </exception>
+		public MessageEventArgs (int index)
 		{
+			if (index < 0)
+				throw new ArgumentOutOfRangeException (nameof (index));
+
 			Index = index;
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:MailKit.MessageEventArgs"/> class.
+		/// </summary>
+		/// <remarks>
+		/// Creates a new <see cref="MessageEventArgs"/>.
+		/// </remarks>
+		/// <param name="index">The message index.</param>
+		/// <param name="uid">The unique id of the message.</param>
+		/// <exception cref="System.ArgumentOutOfRangeException">
+		/// <paramref name="index"/> is out of range.
+		/// </exception>
+		public MessageEventArgs (int index, UniqueId uid)
+		{
+			if (index < 0)
+				throw new ArgumentOutOfRangeException (nameof (index));
+
+			Index = index;
+			UniqueId = uid;
 		}
 
 		/// <summary>
@@ -49,6 +82,17 @@ namespace MailKit {
 		/// <value>The index of the message.</value>
 		public int Index {
 			get; private set;
+		}
+
+		/// <summary>
+		/// Gets the unique ID of the message that changed, if available.
+		/// </summary>
+		/// <remarks>
+		/// Gets the unique ID of the message that changed, if available.
+		/// </remarks>
+		/// <value>The unique ID of the message.</value>
+		public UniqueId? UniqueId {
+			get; internal set;
 		}
 	}
 }

@@ -1,4 +1,4 @@
-//
+﻿//
 // Mono.Security.Protocol.Ntlm.Type3Message - Authentication
 //
 // Authors: Sebastien Pouliot <sebastien@ximian.com>
@@ -6,7 +6,7 @@
 //
 // Copyright (c) 2003 Motus Technologies Inc. (http://www.motus.com)
 // Copyright (c) 2004 Novell, Inc (http://www.novell.com)
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // References
 // a.	NTLM Authentication Scheme for HTTP, Ronald Tschalär
@@ -37,17 +37,11 @@
 using System;
 using System.Text;
 
-#if NETFX_CORE
-using Encoding = Portable.Text.Encoding;
-#endif
-
 namespace MailKit.Security.Ntlm {
 	class Type3Message : MessageBase
 	{
 		readonly Type2Message type2;
 		readonly byte[] challenge;
-		string domain;
-		string host;
 
 		public Type3Message (byte[] message, int startIndex, int length) : base (3)
 		{
@@ -55,25 +49,31 @@ namespace MailKit.Security.Ntlm {
 			type2 = null;
 		}
 
-		public Type3Message (Type2Message type2, string userName, string hostName) : base (3)
+		public Type3Message (Type2Message type2, NtlmAuthLevel level, string userName, string password, string host) : base (3)
 		{
 			this.type2 = type2;
 
-			Level = NtlmSettings.DefaultAuthLevel;
-
-			challenge = (byte[]) type2.Nonce.Clone ();
-			domain = type2.TargetName;
+			challenge = type2.Nonce;
+			Domain = type2.TargetName;
 			Username = userName;
-			host = hostName;
+			Password = password;
+			Level = level;
+			Host = host;
+			Flags = 0;
 
-			Flags = (NtlmFlags) 0x8200;
 			if ((type2.Flags & NtlmFlags.NegotiateUnicode) != 0)
 				Flags |= NtlmFlags.NegotiateUnicode;
 			else
 				Flags |= NtlmFlags.NegotiateOem;
 
+			if ((type2.Flags & NtlmFlags.NegotiateNtlm) != 0)
+				Flags |= NtlmFlags.NegotiateNtlm;
+
 			if ((type2.Flags & NtlmFlags.NegotiateNtlm2Key) != 0)
 				Flags |= NtlmFlags.NegotiateNtlm2Key;
+
+			if ((type2.Flags & NtlmFlags.NegotiateVersion) != 0)
+				Flags |= NtlmFlags.NegotiateVersion;
 		}
 
 		~Type3Message ()
@@ -93,31 +93,11 @@ namespace MailKit.Security.Ntlm {
 		}
 
 		public string Domain {
-			get { return domain; }
-			set {
-				if (string.IsNullOrEmpty (value)) {
-					Flags &= ~NtlmFlags.NegotiateDomainSupplied;
-					value = string.Empty;
-				} else {
-					Flags |= NtlmFlags.NegotiateDomainSupplied;
-				}
-
-				domain = value;
-			}
+			get; set;
 		}
 
 		public string Host {
-			get { return host; }
-			set {
-				if (string.IsNullOrEmpty (value)) {
-					Flags &= ~NtlmFlags.NegotiateWorkstationSupplied;
-					value = string.Empty;
-				} else {
-					Flags |= NtlmFlags.NegotiateWorkstationSupplied;
-				}
-
-				host = value;
-			}
+			get; set;
 		}
 
 		public string Password {
@@ -156,19 +136,19 @@ namespace MailKit.Security.Ntlm {
 			int ntOffset = BitConverterLE.ToUInt16 (message, startIndex + 24);
 			NT = new byte[ntLength];
 			Buffer.BlockCopy (message, startIndex + ntOffset, NT, 0, ntLength);
-			
+
 			int domainLength = BitConverterLE.ToUInt16 (message, startIndex + 28);
 			int domainOffset = BitConverterLE.ToUInt16 (message, startIndex + 32);
-			domain = DecodeString (message, startIndex + domainOffset, domainLength);
+			Domain = DecodeString (message, startIndex + domainOffset, domainLength);
 
 			int userLength = BitConverterLE.ToUInt16 (message, startIndex + 36);
 			int userOffset = BitConverterLE.ToUInt16 (message, startIndex + 40);
 			Username = DecodeString (message, startIndex + userOffset, userLength);
-			
+
 			int hostLength = BitConverterLE.ToUInt16 (message, startIndex + 44);
 			int hostOffset = BitConverterLE.ToUInt16 (message, startIndex + 48);
-			host = DecodeString (message, startIndex + hostOffset, hostLength);
-			
+			Host = DecodeString (message, startIndex + hostOffset, hostLength);
+
 			// Session key.  We don't use it yet.
 			// int skeyLength = BitConverterLE.ToUInt16 (message, startIndex + 52);
 			// int skeyOffset = BitConverterLE.ToUInt16 (message, startIndex + 56);
@@ -176,10 +156,9 @@ namespace MailKit.Security.Ntlm {
 
 		string DecodeString (byte[] buffer, int offset, int len)
 		{
-			if ((Flags & NtlmFlags.NegotiateUnicode) != 0)
-				return Encoding.Unicode.GetString (buffer, offset, len);
+			var encoding = (Flags & NtlmFlags.NegotiateUnicode) != 0 ? Encoding.Unicode : Encoding.UTF8;
 
-			return Encoding.ASCII.GetString (buffer, offset, len);
+			return encoding.GetString (buffer, offset, len);
 		}
 
 		byte[] EncodeString (string text)
@@ -187,38 +166,32 @@ namespace MailKit.Security.Ntlm {
 			if (text == null)
 				return new byte[0];
 
-			if ((Flags & NtlmFlags.NegotiateUnicode) != 0)
-				return Encoding.Unicode.GetBytes (text);
+			var encoding = (Flags & NtlmFlags.NegotiateUnicode) != 0 ? Encoding.Unicode : Encoding.UTF8;
 
-			return Encoding.ASCII.GetBytes (text);
+			return encoding.GetBytes (text);
 		}
 
 		public override byte[] Encode ()
 		{
-			var target = EncodeString (domain);
+			var target = EncodeString (Domain);
 			var user = EncodeString (Username);
-			var hostName = EncodeString (host);
+			var host = EncodeString (Host);
+			var payloadOffset = 64;
+			bool reqVersion;
 			byte[] lm, ntlm;
 
-			if (type2 == null) {
-				if (Level != NtlmAuthLevel.LM_and_NTLM)
-					throw new InvalidOperationException ("Refusing to use legacy-mode LM/NTLM authentication unless explicitly enabled using NtlmSettings.DefaultAuthLevel.");
-				
-				using (var legacy = new ChallengeResponse (Password, challenge)) {
-					lm = legacy.LM;
-					ntlm = legacy.NT;
-				}
-			} else {
-				ChallengeResponse2.Compute (type2, Level, Username, Password, domain, out lm, out ntlm);
-			}
+			ChallengeResponse2.Compute (type2, Level, Username, Password, Domain, out lm, out ntlm);
+
+			if (reqVersion = (type2.Flags & NtlmFlags.NegotiateVersion) != 0)
+				payloadOffset += 8;
 
 			var lmResponseLength = lm != null ? lm.Length : 0;
 			var ntResponseLength = ntlm != null ? ntlm.Length : 0;
 
-			var data = PrepareMessage (64 + target.Length + user.Length + hostName.Length + lmResponseLength + ntResponseLength);
+			var data = PrepareMessage (payloadOffset + target.Length + user.Length + host.Length + lmResponseLength + ntResponseLength);
 
 			// LM response
-			short lmResponseOffset = (short) (64 + target.Length + user.Length + hostName.Length);
+			short lmResponseOffset = (short) (payloadOffset + target.Length + user.Length + host.Length);
 			data[12] = (byte) lmResponseLength;
 			data[13] = (byte) 0x00;
 			data[14] = data[12];
@@ -237,7 +210,7 @@ namespace MailKit.Security.Ntlm {
 
 			// target
 			short domainLength = (short) target.Length;
-			const short domainOffset = 64;
+			short domainOffset = (short) payloadOffset;
 			data[28] = (byte) domainLength;
 			data[29] = (byte) (domainLength >> 8);
 			data[30] = data[28];
@@ -256,7 +229,7 @@ namespace MailKit.Security.Ntlm {
 			data[41] = (byte) (userOffset >> 8);
 
 			// host
-			short hostLength = (short) hostName.Length;
+			short hostLength = (short) host.Length;
 			short hostOffset = (short) (userOffset + userLength);
 			data[44] = (byte) hostLength;
 			data[45] = (byte) (hostLength >> 8);
@@ -271,14 +244,29 @@ namespace MailKit.Security.Ntlm {
 			data[57] = (byte) (messageLength >> 8);
 
 			// options flags
-			data [60] = (byte) Flags;
-			data [61] = (byte)((uint) Flags >> 8);
-			data [62] = (byte)((uint) Flags >> 16);
-			data [63] = (byte)((uint) Flags >> 24);
+			data[60] = (byte) Flags;
+			data[61] = (byte)((uint) Flags >> 8);
+			data[62] = (byte)((uint) Flags >> 16);
+			data[63] = (byte)((uint) Flags >> 24);
+
+			if (reqVersion) {
+				// encode the Windows version as Windows 10.0
+				data[64] = 0x0A;
+				data[65] = 0x0;
+
+				// encode the ProductBuild version
+				data[66] = (byte) (10586 & 0xff);
+				data[67] = (byte) (10586 >> 8);
+
+				// next 3 bytes are reserved and should remain 0
+
+				// encode the NTLMRevisionCurrent version
+				data[71] = 0x0F;
+			}
 
 			Buffer.BlockCopy (target, 0, data, domainOffset, target.Length);
 			Buffer.BlockCopy (user, 0, data, userOffset, user.Length);
-			Buffer.BlockCopy (hostName, 0, data, hostOffset, hostName.Length);
+			Buffer.BlockCopy (host, 0, data, hostOffset, host.Length);
 
 			if (lm != null) {
 				Buffer.BlockCopy (lm, 0, data, lmResponseOffset, lm.Length);

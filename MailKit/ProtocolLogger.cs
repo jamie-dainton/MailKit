@@ -1,9 +1,9 @@
 ﻿//
 // ProtocolLogger.cs
 //
-// Author: Jeffrey Stedfast <jeff@xamarin.com>
+// Author: Jeffrey Stedfast <jestedfa@microsoft.com>
 //
-// Copyright (c) 2013-2015 Xamarin Inc. (www.xamarin.com)
+// Copyright (c) 2013-2020 .NET Foundation and Contributors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,42 +28,43 @@ using System;
 using System.IO;
 using System.Text;
 
-#if NETFX_CORE
-using Encoding = Portable.Text.Encoding;
-#endif
-
 namespace MailKit {
 	/// <summary>
-	/// A protocol logger.
+	/// A default protocol logger for logging the communication between a client and server.
 	/// </summary>
 	/// <remarks>
-	/// A protocol logger.
+	/// A default protocol logger for logging the communication between a client and server.
 	/// </remarks>
 	/// <example>
 	/// <code language="c#" source="Examples\SmtpExamples.cs" region="ProtocolLogger" />
 	/// </example>
 	public class ProtocolLogger : IProtocolLogger
 	{
-		static readonly byte[] ClientPrefix = Encoding.ASCII.GetBytes ("C: ");
-		static readonly byte[] ServerPrefix = Encoding.ASCII.GetBytes ("S: ");
+		static byte[] defaultClientPrefix = Encoding.ASCII.GetBytes ("C: ");
+		static byte[] defaultServerPrefix = Encoding.ASCII.GetBytes ("S: ");
 
+		byte[] clientPrefix = defaultClientPrefix;
+		byte[] serverPrefix = defaultServerPrefix;
 		readonly Stream stream;
+		readonly bool leaveOpen;
 		bool clientMidline;
 		bool serverMidline;
 
-#if !NETFX_CORE
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MailKit.ProtocolLogger"/> class.
 		/// </summary>
 		/// <remarks>
-		/// Creates a new <see cref="ProtocolLogger"/> to log to a specified file.
+		/// Creates a new <see cref="ProtocolLogger"/> to log to a specified file. The file is created if it does not exist.
 		/// </remarks>
+		/// <example>
+		/// <code language="c#" source="Examples\SmtpExamples.cs" region="ProtocolLogger" />
+		/// </example>
 		/// <param name="fileName">The file name.</param>
-		public ProtocolLogger (string fileName)
+		/// <param name="append"><c>true</c> if the file should be appended to; otherwise, <c>false</c>. Defaults to <c>true</c>.</param>
+		public ProtocolLogger (string fileName, bool append = true)
 		{
-			stream = File.OpenWrite (fileName);
+			stream = File.Open (fileName, append ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.Read);
 		}
-#endif
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MailKit.ProtocolLogger"/> class.
@@ -72,11 +73,13 @@ namespace MailKit {
 		/// Creates a new <see cref="ProtocolLogger"/> to log to a specified stream.
 		/// </remarks>
 		/// <param name="stream">The stream.</param>
-		public ProtocolLogger (Stream stream)
+		/// <param name="leaveOpen"><c>true</c> if the stream should be left open after the protocol logger is disposed.</param>
+		public ProtocolLogger (Stream stream, bool leaveOpen = false)
 		{
 			if (stream == null)
-				throw new ArgumentNullException ("stream");
+				throw new ArgumentNullException (nameof (stream));
 
+			this.leaveOpen = leaveOpen;
 			this.stream = stream;
 		}
 
@@ -93,18 +96,81 @@ namespace MailKit {
 			Dispose (false);
 		}
 
+		/// <summary>
+		/// Get the log stream.
+		/// </summary>
+		/// <remarks>
+		/// Gets the log stream.
+		/// </remarks>
+		/// <value>The log sstream.</value>
+		public Stream Stream {
+			get { return stream; }
+		}
+
+		/// <summary>
+		/// Get or set the default client prefix to use when creating new <see cref="MailKit.ProtocolLogger"/> instances.
+		/// </summary>
+		/// <remarks>
+		/// Get or set the default client prefix to use when creating new <see cref="MailKit.ProtocolLogger"/> instances.
+		/// </remarks>
+		/// <value>The default client prefix.</value>
+		public static string DefaultClientPrefix
+		{
+			get { return Encoding.UTF8.GetString (defaultClientPrefix); }
+			set { defaultClientPrefix = Encoding.UTF8.GetBytes (value); }
+		}
+
+		/// <summary>
+		/// Get or set the default server prefix to use when creating new <see cref="MailKit.ProtocolLogger"/> instances.
+		/// </summary>
+		/// <remarks>
+		/// Get or set the default server prefix to use when creating new <see cref="MailKit.ProtocolLogger"/> instances.
+		/// </remarks>
+		/// <value>The default server prefix.</value>
+		public static string DefaultServerPrefix
+		{
+			get { return Encoding.UTF8.GetString (defaultServerPrefix); }
+			set { defaultServerPrefix = Encoding.UTF8.GetBytes (value); }
+		}
+
+		/// <summary>
+		/// Get or set the client prefix to use when logging client messages.
+		/// </summary>
+		/// <remarks>
+		/// Gets or sets the client prefix to use when logging client messages.
+		/// </remarks>
+		/// <value>The client prefix.</value>
+		public string ClientPrefix
+		{
+			get { return Encoding.UTF8.GetString (clientPrefix); }
+			set { clientPrefix = Encoding.UTF8.GetBytes (value); }
+		}
+
+		/// <summary>
+		/// Get or set the server prefix to use when logging server messages.
+		/// </summary>
+		/// <remarks>
+		/// Gets or sets the server prefix to use when logging server messages.
+		/// </remarks>
+		/// <value>The server prefix.</value>
+		public string ServerPrefix
+		{
+			get { return Encoding.UTF8.GetString (serverPrefix); }
+			set { serverPrefix = Encoding.UTF8.GetBytes (value); }
+		}
+
 		#region IProtocolLogger implementation
 
 		static void ValidateArguments (byte[] buffer, int offset, int count)
 		{
 			if (buffer == null)
-				throw new ArgumentNullException ("buffer");
+				throw new ArgumentNullException (nameof (buffer));
 
 			if (offset < 0 || offset > buffer.Length)
-				throw new ArgumentOutOfRangeException ("offset");
+				throw new ArgumentOutOfRangeException (nameof (offset));
 
 			if (count < 0 || count > (buffer.Length - offset))
-				throw new ArgumentOutOfRangeException ("count");
+				throw new ArgumentOutOfRangeException (nameof (count));
 		}
 
 		void Log (byte[] prefix, ref bool midline, byte[] buffer, int offset, int count)
@@ -154,7 +220,7 @@ namespace MailKit {
 		public void LogConnect (Uri uri)
 		{
 			if (uri == null)
-				throw new ArgumentNullException ("uri");
+				throw new ArgumentNullException (nameof (uri));
 
 			var message = string.Format ("Connected to {0}\r\n", uri);
 			var buf = Encoding.ASCII.GetBytes (message);
@@ -174,7 +240,10 @@ namespace MailKit {
 		/// Logs a sequence of bytes sent by the client.
 		/// </summary>
 		/// <remarks>
-		/// Logs a sequence of bytes sent by the client.
+		/// <para>Logs a sequence of bytes sent by the client.</para>
+		/// <para><see cref="LogClient(byte[], int, int)"/> is called by the <see cref="IMailService"/> upon every successful
+		/// write operation to its underlying network stream, passing the exact same <paramref name="buffer"/>,
+		/// <paramref name="offset"/>, and <paramref name="count"/> arguments to the logging function.</para>
 		/// </remarks>
 		/// <param name='buffer'>The buffer to log.</param>
 		/// <param name='offset'>The offset of the first byte to log.</param>
@@ -198,14 +267,16 @@ namespace MailKit {
 		{
 			ValidateArguments (buffer, offset, count);
 
-			Log (ClientPrefix, ref clientMidline, buffer, offset, count);
+			Log (clientPrefix, ref clientMidline, buffer, offset, count);
 		}
 
 		/// <summary>
 		/// Logs a sequence of bytes sent by the server.
 		/// </summary>
 		/// <remarks>
-		/// Logs a sequence of bytes sent by the server.
+		/// <para>Logs a sequence of bytes sent by the server.</para>
+		/// <para><see cref="LogServer(byte[], int, int)"/> is called by the <see cref="IMailService"/> upon every successful
+		/// read of its underlying network stream with the exact buffer that was read.</para>
 		/// </remarks>
 		/// <param name='buffer'>The buffer to log.</param>
 		/// <param name='offset'>The offset of the first byte to log.</param>
@@ -229,7 +300,7 @@ namespace MailKit {
 		{
 			ValidateArguments (buffer, offset, count);
 
-			Log (ServerPrefix, ref serverMidline, buffer, offset, count);
+			Log (serverPrefix, ref serverMidline, buffer, offset, count);
 		}
 
 		#endregion
@@ -248,7 +319,7 @@ namespace MailKit {
 		/// <c>false</c> to release only the unmanaged resources.</param>
 		protected virtual void Dispose (bool disposing)
 		{
-			if (disposing)
+			if (disposing && !leaveOpen)
 				stream.Dispose ();
 		}
 
